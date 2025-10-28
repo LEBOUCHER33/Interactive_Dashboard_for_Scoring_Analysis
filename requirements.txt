@@ -1,0 +1,20 @@
+# outils de feature_engineering / analyse des data
+pandas
+numpy
+scikit_learn
+
+# outils de visualisation
+matplotlib
+seaborn
+
+# outils de ML
+lightgbm
+shap
+
+
+# outils MLops
+streamlit
+
+# outil de gestion de l'API
+fastapi
+uvicorn

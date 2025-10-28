@@ -32,7 +32,7 @@ logger.info(f"Demarrage du script de test de l'api de scoring, URL de l'API: {ur
 data = pd.read_csv("../data_test.csv")
 
 # selectionner un echantillon de 5 lignes
-data_sample = data.sample(n=5, random_state=42)
+data_sample = data.sample(n=1, random_state=42)
 logger.info(f"Echantillon de donnees selectionne pour le test de l'API :\n{data_sample}")
 
 # nettoyer les donnees
@@ -46,9 +46,10 @@ logger.debug(f"Donnees converties en format JSON pour l'API :\n{data_json}")
 try:
     response = requests.post(url_cloud, 
                              headers={"Content-Type": "application/json"}, 
-                             data={"data": data_json})
+                             json=data_json)
     response.raise_for_status()  # lever une erreur pour les codes de statut 4xx/5xx
     logger.info("Requete POST envoyee avec succes a l'API.")
+    print("Reponse de l'API :", response.json(), response.status_code)
 except requests.exceptions.RequestException as e:
     logger.error(f"Erreur lors de l'envoi de la requete POST a l'API : {e}")
     raise

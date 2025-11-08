@@ -9,7 +9,6 @@ Script permettant de tester le deploiement de l'api de scoring sur un serveur cl
 
 # importer les bibliotheques necessaires
 import requests
-import json
 import pandas as pd
 import numpy as np
 from loguru import logger
@@ -32,7 +31,7 @@ url_local = "http://127.0.0.1:8000/predict"
 
 
 # creer un dataframe d'exemple
-data = pd.read_csv("./Data/application_test_final.csv")
+data = pd.read_csv("./Data/Data_cleaned/application_test_final.csv")
 
 # selectionner un echantillon de 5 lignes
 data_sample = data.sample(n=1, random_state=42)

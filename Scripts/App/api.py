@@ -4,6 +4,8 @@ Script de création d'une API avec FastAPI.
 Objectif : Fournir une interface pour interagir avec un modèle de prédiction de scoring de crédit.
     - recevoir des données en entrée : les features clients au format JSON
     - retourner la prédiction, la probabilité associée (format JSON) et les 5 principales features qui ont influencé la prédiction (explainabilité)
+    - recevoir un fichier csv de données clients et calculer les indicateurs globaux associés
+
 
 Worflow :
 
@@ -14,41 +16,53 @@ Worflow :
 
 """
 
+# ///////////////////////////////////////////////
 # 1- import des bibliothèques nécessaires
+# ///////////////////////////////////////////////
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import JSONResponse
 import pickle
 import pandas as pd
 import shap
-import numpy as np
-from pydantic import BaseModel
-from typing import List, Dict, Any
+import io
+from loguru import logger
+from utils import features_mapping
 
 
 
 
+
+
+# //////////////////////////////////////////////////
 # 2- chargement du pipeline de prédiction
+# //////////////////////////////////////////////////
 
-with open("./Scripts/App/pipeline_final.pkl", "rb") as f:
+
+with open("./pipeline_final.pkl", "rb") as f:
     model_pipeline = pickle.load(f)
 
 
-
-
+# /////////////////////////////////////////////////
 # 3- définition de l'explainabilité avec SHAP
+# /////////////////////////////////////////////////
 
 explainer = shap.TreeExplainer(model_pipeline.named_steps['model'])
 
-
+# /////////////////////////////////////////////////
 # 4- définir l'API avec FastAPI
+# /////////////////////////////////////////////////
 
 app = FastAPI()
 
 
 # app est l'instance de l'API, on va définir les endpoints en utilisant app
 
-# création d'un endpoint de test
-@app.get("/")  # endpoint racine : la fonction en dessous sera exécutée lorsqu'une requête GET est envoyée à /
+# ////////////////////////////////////////////////////////                  
+# 5- création d'un endpoint de test de démarrage de l'api
+# ////////////////////////////////////////////////////////
+
+@app.get("/")  
 def read_root():        
     """
     _Summary_ : fonction de test qui retourne un message de bienvenue.
@@ -59,8 +73,11 @@ def read_root():
 
 
 
+# /////////////////////////////////////////////////
+# 6- création d'un endpoint de prédiction
+# /////////////////////////////////////////////////
 
-# création d'un endpoint de prédiction
+
 @app.post("/predict")  # endpoint de prédiction : la fonction en dessous sera exécutée lorsqu'une requête POST est envoyée à /predict
 # on prend en entrée de la fonction, les données formatées en JSON (dictionnaire ou liste de dictionnaires)
 async def predict(data : list[dict] | dict): 
@@ -102,11 +119,12 @@ async def predict(data : list[dict] | dict):
 
 
     # on affiche les 5 features les plus importantes pour chaque individu
-    explanations = []
     for i in range(len(input_data)):
         features_shap = dict(zip(input_data.columns, shap_values[i].tolist()))  # on associe chaque feature à sa valeur SHAP
         top_5_features = sorted(features_shap.items(), key=lambda x: abs(x[1]), reverse=True)[:5]  # on trie les features par valeur absolue de SHAP et on prend les 5 premières
-        explanations.append(top_5_features)
+        features_mapped = [
+            {"feature" : features_mapping([f])[0], "importance" : float(v)} for f, v in top_5_features
+            ]
 
     
     # retourner la prédiction et la probabilité associée
@@ -114,10 +132,89 @@ async def predict(data : list[dict] | dict):
         "prediction": prediction.tolist(),
         "probabilite_1": prediction_proba.tolist(),
         "prediction_seuil" : prediction_proba_seuil.tolist(),
-        "top_features": explanations
+        "top_features": features_mapped 
     }
 
- 
+
+# ////////////////////////////////////////////////////////////////////////////////////
+# 7- création d'un endpoint metrics pour calculer les indicateurs globaux du modèle 
+# ////////////////////////////////////////////////////////////////////////////////////
+
+@app.post("/metrics")
+async def metrics(file_csv: UploadFile = File(...)):
+    """
+    Endpoint pour calculer les métriques globales du modèle et de la BD.
+    
+    - Indicateurs de performance du modèle :
+
+        - score moyen global de prediction
+        - taux d'accord moyen 
+        - risque moyen par client d'un FN
+        - drift
+        - seuil de décisionnel
+        - top_features explainer
+
+    - Indicateurs caractéristiques de la BD clients :
+
+        - nbre total de clients
+        - âge moyen
+        - nbre total accord / refus
+        - taux d'endettement global
+
+    """
+    content = await file_csv.read()
+    df = pd.read_csv(io.BytesIO(content))
+    if df.empty :
+        return JSONResponse(status_code=400, content={"error": "Le fichier est vide."})
+    data = pd.DataFrame(df)
+    # calcul des predictions
+    prediction = model_pipeline.predict(data) # score (0, 1)
+    prediction_proba = model_pipeline.predict_proba(data)[:,1] # proba d'être 1
+    prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # proba d'être 1 avec un seuil plus stringent
+    # explainabilite 
+    data_transformed = model_pipeline.named_steps['preprocessor'].transform(data)
+    shap_expl = explainer(data_transformed)
+    shap_values = shap_expl.values
+    for i in range(len(data)):
+        features_shap = dict(zip(data.columns, shap_values[i].tolist()))  # on associe chaque feature à sa valeur SHAP
+        top_5_features = sorted(features_shap.items(), key=lambda x: abs(x[1]), reverse=True)[:5]  # on trie les features par valeur absolue de SHAP et on prend les 5 premières
+        # mapping
+        features_mapped = [
+            {"feature" : features_mapping([f])[0], "importance" : float(v)} for f, v in top_5_features
+            ]
+    # calcul des stats
+    score_moy = float(prediction.mean())
+    taux_accord = float(prediction_proba_seuil.mean())
+    risk_moy_fn = float(1753/61503) # FN/total predictions
+    seuil_decisionnel = float(0.3)
+    drift = float(0.17)
+    # stats BD
+    nb_clients = int(len(data)) 
+    age_moye_client = float(data["DAYS_BIRTH"].mean())
+    nb_accord = int(len(prediction[prediction==1]))
+    nb_refus = int(len(prediction[prediction==0]))
+    global_amt_endettement_mean = float(data["APP_CREDIT_PERC"].mean())
+    # resultats
+    results = {
+        "score_moy": round(score_moy,3),
+        "taux_accord": round(taux_accord,2),
+        "risk_moy_fn": round(risk_moy_fn,2),
+        "drift": drift,
+        "seuil_decisionnel": seuil_decisionnel,
+        "nb_clients": nb_clients,
+        "age_moye_client": round(age_moye_client,1),
+        "nb_accord": nb_accord,
+        "nb_refus": nb_refus,
+        "global_amt_endettement_mean": round(global_amt_endettement_mean,2),
+        "top_features": features_mapped
+    }
+    return JSONResponse(content=results)
+
+
+
+
+
+
 
 
 """

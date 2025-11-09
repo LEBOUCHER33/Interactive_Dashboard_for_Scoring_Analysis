@@ -1,29 +1,30 @@
 """
 Script pour implémenter les fonctions utilitaires de l'API
 
-1- fonction de mapping pour définir un dictionnaire de correspondance entre les features du df
+1- fonction de calcul des predictions sur le dataset de test et des principales indicateurs
+
+2- fonction de mapping pour définir un dictionnaire de correspondance entre les features du df
 et des noms descriptifs explicites 
 """
 
+# ////////////////////////////////
+# import des lib
+# ////////////////////////////////
+
+import pandas as pd
 
 
-# ///////////////////////////////////////
-# Fonction de mapping des features
-# ///////////////////////////////////////
+# ///////////////////////////////
+# dictionnaire de mapping
+# ///////////////////////////////
 
-def features_mapping(features_list):
-    """
-    _Summary_: Fonction qui prend en entrée une liste de features et applique un dictionnaire de mapping
-    _Args_: 
-    _Returns_:
-    """
-    feature_mapping = {
+feature_mapping = {
 # --- Sources externes / score socio-économique ---
     "EXT_SOURCE_1": "Source externe de risque 1 (score socio-économique)",
     "EXT_SOURCE_2": "Source externe de risque 2 (score socio-économique)",
     "EXT_SOURCE_3": "Source externe de risque 3 (score socio-économique)",
     # --- Informations sur les crédits précédents ---
-    "DAYS_CREDIT_mean": "Âge moyen des crédits précédents (jours)",
+    "DAYS_CREDIT_mean": "Ancienneté moyenne des crédits précédents (jours)",
     "DAYS_CREDIT_min": "Ancienneté minimale d’un crédit précédent (jours)",
     "DAYS_CREDIT_max": "Ancienneté maximale d’un crédit précédent (jours)",
     "DAYS_CREDIT_std": "Variabilité des durées de crédit précédents",
@@ -43,10 +44,10 @@ def features_mapping(features_list):
     "CREDITCARD_CNT_DRAWINGS_CURRENT_MAX": "Nombre max de transactions par carte",
     "CREDITCARD_AMT_INST_MIN_REGULARITY_MEAN": "Régularité moyenne des paiements sur carte",
     # --- Informations personnelles ---
-    "DAYS_BIRTH": "Âge du client (jours, négatif → plus âgé)",
+    "DAYS_BIRTH": "Âge du client",
     "CODE_GENDER_M": "Genre : Homme (1/0)",
     "CODE_GENDER_F": "Genre : Femme (1/0)",
-    "DAYS_EMPLOYED": "Ancienneté professionnelle (jours)",
+    "DAYS_EMPLOYED": "Ancienneté professionnelle",
     "DAYS_ID_PUBLISH": "Ancienneté du document d’identité (jours)",
     "DAYS_REGISTRATION": "Ancienneté d’enregistrement au domicile (jours)",
     "DAYS_LAST_PHONE_CHANGE": "Délai depuis le dernier changement de téléphone (jours)",
@@ -68,8 +69,8 @@ def features_mapping(features_list):
     "FLOORSMIN_AVG": "Étage minimum moyen",
     "FLOORSMIN_MEDI": "Étage minimum médian",
     "FLOORSMIN_MODE": "Étage minimum mode",
-    "ELEVATORS_AVG": "Présence moyenne d’ascenseurs",
-    "ELEVATORS_MEDI": "Présence médiane d’ascenseurs",
+    "ELEVATORS_AVG": "Présence d’ascenseurs (moy)",
+    "ELEVATORS_MEDI": "Présence d’ascenseurs (med)",
     "ELEVATORS_MODE": "Présence d’ascenseurs (mode)",
     "WALLSMATERIAL_MODE_Panel": "Matériau des murs : panneau",
     "WALLSMATERIAL_MODE_nan": "Matériau des murs : inconnu",
@@ -127,7 +128,97 @@ def features_mapping(features_list):
     "FLAG_DOCUMENT_6": "Document 6 fourni (revenus/employeur)",
     "FLAG_WORK_PHONE": "Téléphone professionnel actif"
     }
-    return [feature_mapping.get(f, f) for f in features_list]
+
+
+
+
+# ///////////////////////////////////////
+# Fonction de mapping des features
+# ///////////////////////////////////////
+
+def features_mapping(feature : str, feature_mapping : dict = feature_mapping) -> str:
+    """
+    _Summary_: Fonction qui mappe les noms des variables en noms explicites
+    _Args_: 
+        - feature : str
+        - feature_mapping : dict
+    _Returns_:
+        - les features mappées
+    """
+
+    return feature_mapping.get(feature, feature)
+
+
+
+# /////////////////////////////////////////////
+# 1- Fonction de calcul des predictions
+# /////////////////////////////////////////////
+
+
+def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : object, 
+                     features_mapping = features_mapping, sample_size : int = 10000):
+    """
+    _Summary_ : Calcul des indicateurs clés d'un dataframe d'une BD clients
+    _Args_:
+        df (pd.DataFrame): dataframe complet (ou échantillonage) de la BD clients à tester_
+        model_pipeline (object): _pipeline de prédiction entrainé_
+        explainer (object): _objet shap déjà initialisé_
+        features_mapping (dict): _fonction de mapping des features_
+        sample_size (int, optional): _taille de l'échantillon à utiliser pour le calcul des indicateurs. 
+                                    Par défaut à 10000_
+    _Returns_:
+        _dict_: 
+            - métriques principales calculées
+            - top features SHAP
+    """
+    # data
+    if sample_size is not None and sample_size < len(df):
+        df = df.sample(n=sample_size, random_state=42)
+    # calcul des predictions
+    prediction = model_pipeline.predict(df) # score (0, 1)
+    prediction_proba = model_pipeline.predict_proba(df)[:,1] # proba d'être 1
+    prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # proba d'être 1 avec un seuil plus stringent
+    # explainabilite 
+    data_transformed = model_pipeline.named_steps['preprocessor'].transform(df)
+    shap_expl = explainer(data_transformed)
+    shap_values = shap_expl.values
+    explanations = []
+    for i in range(len(df)):
+        features_shap = dict(zip(df.columns, shap_values[i].tolist()))  # on associe chaque feature à sa valeur SHAP
+        top_5_features = sorted(features_shap.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
+        # mapping
+        features_mapped = {features_mapping(f): v for f, v in top_5_features}
+        explanations.append(features_mapped)
+    # calcul des metriques
+    score_moy = float(prediction.mean())
+    taux_accord = float(prediction_proba_seuil.mean())
+    # calcul des stats
+    score_moy = float(prediction.mean())
+    taux_accord = float(prediction_proba_seuil.mean())
+    risk_moy_fn = float(1753/61503) # FN/total predictions
+    seuil_decisionnel = float(0.3)
+    drift = float(0.17)
+    # stats BD
+    nb_clients = int(len(df)) 
+    age_moye_client = float(df["DAYS_BIRTH"].mean())
+    nb_accord = int(len(prediction[prediction==1]))
+    nb_refus = int(len(prediction[prediction==0]))
+    global_amt_endettement_mean = float(df["APP_CREDIT_PERC_mean"].mean())
+    # resultats
+    metrics = {
+        "score_moy": round(score_moy,3),
+        "taux_accord": round(taux_accord,2),
+        "risk_moy_fn": round(risk_moy_fn,2),
+        "drift": drift,
+        "seuil_decisionnel": seuil_decisionnel,
+        "nb_clients": nb_clients,
+        "age_moye_client": round(age_moye_client,1),
+        "nb_accord": nb_accord,
+        "nb_refus": nb_refus,
+        "global_amt_endettement_mean": round(global_amt_endettement_mean,2),
+        "top_features": explanations
+    }
+    return metrics
 
 
 

@@ -27,10 +27,9 @@ import pandas as pd
 import shap
 import io
 from loguru import logger
-from utils import features_mapping
-
-
-
+from Scripts.App.utils import features_mapping, compute_metrics
+import numpy as np
+import traceback
 
 
 
@@ -39,7 +38,7 @@ from utils import features_mapping
 # //////////////////////////////////////////////////
 
 
-with open("./pipeline_final.pkl", "rb") as f:
+with open("./Scripts/App/pipeline_final.pkl", "rb") as f:
     model_pipeline = pickle.load(f)
 
 
@@ -48,6 +47,11 @@ with open("./pipeline_final.pkl", "rb") as f:
 # /////////////////////////////////////////////////
 
 explainer = shap.TreeExplainer(model_pipeline.named_steps['model'])
+# sauvegarde de l'explainer
+with open("./Scripts/App/explainer.pkl", "wb") as f:
+    pickle.dump(explainer, f)
+
+
 
 # /////////////////////////////////////////////////
 # 4- définir l'API avec FastAPI
@@ -119,20 +123,20 @@ async def predict(data : list[dict] | dict):
 
 
     # on affiche les 5 features les plus importantes pour chaque individu
+    explanation = []
     for i in range(len(input_data)):
         features_shap = dict(zip(input_data.columns, shap_values[i].tolist()))  # on associe chaque feature à sa valeur SHAP
-        top_5_features = sorted(features_shap.items(), key=lambda x: abs(x[1]), reverse=True)[:5]  # on trie les features par valeur absolue de SHAP et on prend les 5 premières
-        features_mapped = [
-            {"feature" : features_mapping([f])[0], "importance" : float(v)} for f, v in top_5_features
-            ]
-
+        features_shap_mapped = {features_mapping(f): v for f, v in features_shap.items()}
+        top_5_features = sorted(features_shap_mapped.items(), key=lambda x: abs(x[1]), reverse=True)[:5]  # on trie les features par valeur absolue de SHAP et on prend les 5 premières
+        explanation.append(top_5_features)
+    
     
     # retourner la prédiction et la probabilité associée
     return {
         "prediction": prediction.tolist(),
         "probabilite_1": prediction_proba.tolist(),
         "prediction_seuil" : prediction_proba_seuil.tolist(),
-        "top_features": features_mapped 
+        "top_features": explanation 
     }
 
 
@@ -141,9 +145,14 @@ async def predict(data : list[dict] | dict):
 # ////////////////////////////////////////////////////////////////////////////////////
 
 @app.post("/metrics")
-async def metrics(file_csv: UploadFile = File(...)):
+async def metrics(file_csv: UploadFile = File(...),
+                  sample_size: int = None):
     """
     Endpoint pour calculer les métriques globales du modèle et de la BD.
+
+    _Args_ :
+        - file_csv (UploadFile): fichier csv de la BD clients
+        - sample_size (int, optional): taille de l'échantillon à utiliser pour le calcul des indicateurs. Par défaut à None 
     
     - Indicateurs de performance du modèle :
 
@@ -162,53 +171,28 @@ async def metrics(file_csv: UploadFile = File(...)):
         - taux d'endettement global
 
     """
-    content = await file_csv.read()
-    df = pd.read_csv(io.BytesIO(content))
-    if df.empty :
-        return JSONResponse(status_code=400, content={"error": "Le fichier est vide."})
-    data = pd.DataFrame(df)
-    # calcul des predictions
-    prediction = model_pipeline.predict(data) # score (0, 1)
-    prediction_proba = model_pipeline.predict_proba(data)[:,1] # proba d'être 1
-    prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # proba d'être 1 avec un seuil plus stringent
-    # explainabilite 
-    data_transformed = model_pipeline.named_steps['preprocessor'].transform(data)
-    shap_expl = explainer(data_transformed)
-    shap_values = shap_expl.values
-    for i in range(len(data)):
-        features_shap = dict(zip(data.columns, shap_values[i].tolist()))  # on associe chaque feature à sa valeur SHAP
-        top_5_features = sorted(features_shap.items(), key=lambda x: abs(x[1]), reverse=True)[:5]  # on trie les features par valeur absolue de SHAP et on prend les 5 premières
-        # mapping
-        features_mapped = [
-            {"feature" : features_mapping([f])[0], "importance" : float(v)} for f, v in top_5_features
-            ]
-    # calcul des stats
-    score_moy = float(prediction.mean())
-    taux_accord = float(prediction_proba_seuil.mean())
-    risk_moy_fn = float(1753/61503) # FN/total predictions
-    seuil_decisionnel = float(0.3)
-    drift = float(0.17)
-    # stats BD
-    nb_clients = int(len(data)) 
-    age_moye_client = float(data["DAYS_BIRTH"].mean())
-    nb_accord = int(len(prediction[prediction==1]))
-    nb_refus = int(len(prediction[prediction==0]))
-    global_amt_endettement_mean = float(data["APP_CREDIT_PERC"].mean())
-    # resultats
-    results = {
-        "score_moy": round(score_moy,3),
-        "taux_accord": round(taux_accord,2),
-        "risk_moy_fn": round(risk_moy_fn,2),
-        "drift": drift,
-        "seuil_decisionnel": seuil_decisionnel,
-        "nb_clients": nb_clients,
-        "age_moye_client": round(age_moye_client,1),
-        "nb_accord": nb_accord,
-        "nb_refus": nb_refus,
-        "global_amt_endettement_mean": round(global_amt_endettement_mean,2),
-        "top_features": features_mapped
-    }
-    return JSONResponse(content=results)
+    try:
+        content = await file_csv.read()
+        df = pd.read_csv(io.BytesIO(content))
+
+        if df.empty :
+            return JSONResponse(status_code=400, content={"error": "Le fichier est vide."})
+        data = pd.DataFrame(df)
+        data = data.replace({np.nan: None, np.inf: None, -np.inf: None})
+        # calcul des métriques
+        metrics = compute_metrics(df=data, 
+                                  model_pipeline=model_pipeline,
+                                  features_mapping=features_mapping,
+                                  explainer=explainer,
+                                  sample_size=sample_size)
+        return JSONResponse(status_code=200, content=metrics)
+    except Exception as e:
+        print (traceback.format_exc())
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
+
+
+
 
 
 
@@ -221,7 +205,7 @@ async def metrics(file_csv: UploadFile = File(...)):
 Pour tester en local l'API, lancer le server local :
 url = "http://127.0.0.1:8000/predict"
 ```bash
-uvicorn api:app --reload
+uvicorn Scripts.App.api:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 lien url de l'api sur le cloud :

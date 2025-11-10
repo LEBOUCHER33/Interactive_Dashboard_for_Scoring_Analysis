@@ -37,17 +37,20 @@ logger.add("logs/request_api_debug.log", format="{time} {level} {message}", leve
 
 
 # definir les url de l'api
-url_cloud = "https://client-scoring-model.onrender.com"
-url_local = "http://127.0.0.1:8000"
 
-url_predict_local = f"{url_local}/predict"
-url_predict_cloud = f"{url_cloud}/predict"
+USE_RENDER = True  # False = local, True = Render
 
-logger.info(f"Demarrage du script de test de l'api de scoring, URL de l'API: {url_cloud}")
 
+if USE_RENDER:
+    API_URL = "https://client-scoring-model.onrender.com"
+else:
+    API_URL = "http://127.0.0.1:8000"
+
+url_predict_cloud = f"{API_URL}/predict"
+url_predict_local = f"{API_URL}/predict"
 
 try:
-    requests.get("http://127.0.0.1:8000")
+    requests.get(API_URL)
 except requests.exceptions.ConnectionError:
     print("❌ Impossible de se connecter à l’API.")
     print(traceback.format_exc())
@@ -95,8 +98,9 @@ logger.add("logs/request_metrics_error.log", format="{time} {level} {message}", 
 
 # définir les paramètres
 
-url_metrics_cloud = f"{url_cloud}/metrics"
-url_metrics_local = f"{url_local}/metrics"
+url_metrics_cloud = f"{API_URL}/metrics"
+url_metrics_local = f"{API_URL}/metrics"
+
 
 
 file_path = "./Data/Data_cleaned/application_test_final.csv"
@@ -127,6 +131,12 @@ try:
 
 except requests.exceptions.RequestException as e:
     logger.error(f"Erreur HTTP : {e}")
+    print(traceback.format_exc())
+    exit()
+except ValueError as e:
+    logger.error(f"Erreur de décodage JSON : {e}")
+    print(traceback.format_exc())
+    exit()
 except Exception as e:
     logger.error(f"Erreur inattendue : {e}")
 

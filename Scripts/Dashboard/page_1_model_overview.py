@@ -53,14 +53,16 @@ import requests
 # 2- Paramètres
 # /////////////////////////////////////////
 
-data = pd.read_csv("../data_test.csv")
-url_cloud = "https://client-scoring-model.onrender.com/predict"
-url_local = "http://127.0.0.1:8000/predict"
-url_metrics_cloud = "https://client-scoring-model.onrender.com/metrics"
-url_metrics_local = "http://127.0.0.1:8000/metrics"
-sample_size = len(data)
-file_path = "../Data/Data_cleaned/application_test_final.csv"
+url_cloud = "https://client-scoring-model.onrender.com"
+url_local = "http://127.0.0.1:8000"
+url_predict_cloud = f"{url_cloud}/predict"
+url_predict_local = f"{url_local}/predict"
+url_metrics_cloud = f"{url_cloud}/metrics"
+url_metrics_local = f"{url_local}/metrics"
+
+file_path = "../../Data/Data_cleaned/application_test_final.csv"
 data = pd.read_csv(file_path)
+sample_size = len(data)
 
 
 
@@ -83,7 +85,7 @@ st.header("Outil métier d'aide à la décision pour l'octroi d'un crédit à la
 # calcul et affichage des métriques globales de performance du modèle
 # //////////////////////////////////////////////////////////////////////
 
-st.markdown(f"Uploading de la Base de Données clients ({sample_size} clients")
+
 
 with open(file_path, "rb") as file:
     with open(file_path, "rb") as file:
@@ -113,12 +115,14 @@ if response.status_code == 200:
         st.metric("Crédits refusés : ", f"{metrics['nb_refus']*100/metrics['nb_clients']:.2f}%")
         st.metric("taux d'endettement moyen : ", f"{metrics['global_amt_endettement_mean']:.2f}%")
 
-# /////////////////////////////////
+# ////////////////////////////////////
 # extrait du fichier client
-# /////////////////////////////////
+# ////////////////////////////////////
 
-st.subheader("Extrait du fichier clients")
+st.markdown(f"Uploading de la Base de Données clients ({sample_size} clients")
 st.write(data.head(5))
+
+
 
 # //////////////////////////////////
 # sélection du client

@@ -19,6 +19,8 @@ RUN pip install -r requirements.txt
 
 # copie du script lié à l'application
 COPY Scripts/App/api.py ./Scripts/App/api.py
+COPY Scripts/App/utils.py ./Scripts/App/utils.py
+
 
 # copie du pipeline et du modèle entrainé
 COPY Scripts/App/pipeline_final.pkl ./Scripts/App/pipeline_final.pkl

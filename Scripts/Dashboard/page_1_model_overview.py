@@ -98,7 +98,7 @@ if response.status_code == 200:
             st.metric(key, value)
     col1, col2 = st.columns(2)
     with col1:
-        st.header("Indicateurs de performance")
+        st.subheader("Indicateurs de performance")
         st.metric("Risque moyen par client d'un FN :", f"{metrics['risk_moy_fn']*100:.2f}%")
         st.metric("Score moyen global :", f"{metrics['score_moy']*100:.2f}%")
         st.metric("Taux d'accord moyen :", f"{metrics['taux_accord']*100:.2f}%")
@@ -106,7 +106,7 @@ if response.status_code == 200:
         st.metric("seuil décisionnel :", 0.3)
         
     with col2:
-        st.header("Données clients")
+        st.subheader("Données clients")
         st.metric("Nombre de demandes : ", f"{metrics['nb_clients']}")
         st.metric("Crédits accordés : ", f"{metrics['nb_accord']*100/metrics['nb_clients']:.2f}%")        
         st.metric("Crédits refusés : ", f"{metrics['nb_refus']*100/metrics['nb_clients']:.2f}%")
@@ -115,3 +115,18 @@ if response.status_code == 200:
 # /////////////////////////////////
 # extrait du fichier client
 # /////////////////////////////////
+
+st.subheader("Extrait du fichier clients")
+st.write(data.head(5))
+
+# //////////////////////////////////
+# sélection du client
+# //////////////////////////////////
+
+st.subheader("👤 Sélectionner un client pour l’analyse individuelle")
+if "SK_ID_CURR" in data.columns:
+    client_id = st.selectbox("Choisissez un identifiant client :", data["SK_ID_CURR"].unique())
+    st.write(f"Client sélectionné : {client_id}")
+    st.page_link("pages/dashboard_client.py", label="➡️ Aller à l'analyse du client sélectionné", icon="🔎")
+else:
+    st.warning("⚠️ Colonne `SK_ID_CURR` absente du jeu de données.")

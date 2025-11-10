@@ -27,6 +27,6 @@ COPY Scripts/App/pipeline_final.pkl ./Scripts/App/pipeline_final.pkl
 EXPOSE 8000
 
 # execution de l'application lors du lancement du conteneur
-WORKDIR /app/Scripts
+WORKDIR /app/Scripts/App
 CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
 

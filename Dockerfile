@@ -18,10 +18,10 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # copie du script lié à l'application
-COPY Scripts/api.py ./Scripts/api.py
+COPY Scripts/App/api.py ./Scripts/App/api.py
 
 # copie du pipeline et du modèle entrainé
-COPY Scripts/pipeline_final.pkl ./Scripts/pipeline_final.pkl
+COPY Scripts/App/pipeline_final.pkl ./Scripts/App/pipeline_final.pkl
 
 # expose le port local de l'api
 EXPOSE 8000

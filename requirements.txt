@@ -1,3 +1,4 @@
+
 # outils de feature_engineering / analyse des data
 pandas
 numpy
@@ -20,3 +21,4 @@ fastapi
 uvicorn
 
 loguru
+python-multipart

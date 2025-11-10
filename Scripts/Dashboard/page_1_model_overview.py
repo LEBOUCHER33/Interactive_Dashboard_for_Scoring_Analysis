@@ -50,29 +50,68 @@ import requests
 
 
 # /////////////////////////////////////////
-# 2- Loading du fichier client
+# 2- Paramètres
 # /////////////////////////////////////////
 
 data = pd.read_csv("../data_test.csv")
+url_cloud = "https://client-scoring-model.onrender.com/predict"
+url_local = "http://127.0.0.1:8000/predict"
+url_metrics_cloud = "https://client-scoring-model.onrender.com/metrics"
+url_metrics_local = "http://127.0.0.1:8000/metrics"
+sample_size = 10000
+file_path = "../Data/Data_cleaned/application_test_final.csv"
+data = pd.read_csv(file_path)
+
 
 
 # /////////////////////////////////////////
 # conception de la page 1
 # /////////////////////////////////////////
 
-st.set_page_config(page_title='Scoring Dashboard', layout='wide')
-st.title("Credit Scoring Dashboard")
+
+# /////////////////////////////////////////
+# Titre
+# /////////////////////////////////////////
+
+st.set_page_config(page_title='Scoring Credit Dashboard', layout='wide')
+st.icon="📊"
+st.title("📊Credit Scoring Dashboard")
 
 st.header("Outil métier d'aide à la décision pour l'octroi d'un crédit à la consommation")
 
-col1, col2 = st.columns(2)
-with col1:
-    st.header("Indicateurs de performance")
-    st.metric("data_drift :", "Stable")
-    st.metric("seuil décisionnel :", 0.3)
-    
-with col2:
-    st.header("Données clients")
-    st.metric("Nombre de demandes : ", 40000)
-    st.metric("Crédits accordés : ", 5000)
-    st.metric("Crédits refusés : ", 35000)
+# //////////////////////////////////////////////////////////////////////
+# calcul et affichage des métriques globales de performance du modèle
+# //////////////////////////////////////////////////////////////////////
+
+
+with open(file_path, "rb") as file:
+    with open(file_path, "rb") as file:
+        files = {"file_csv": (file_path, file, "text/csv")}
+        params = {"sample_size": sample_size}
+        response = requests.post(url_metrics_local, files=files, params=params)
+if response.status_code == 200:
+    logger.info("Requete POST envoyee avec succes a l'API.")
+    metrics = response.json()  
+    # affichage
+    for key, value in metrics.items():
+        if key != "top_features":
+            st.metric(key, value)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.header("Indicateurs de performance")
+        st.metric("Risque moyen par client d'un FN :", f"{metrics['risk_moy_fn']*100:.2f}%")
+        st.metric("Score moyen global :", f"{metrics['score_moy']*100:.2f}%")
+        st.metric("Taux d'accord moyen :", f"{metrics['taux_accord']*100:.2f}%")
+        st.metric("data_drift :", "Stable")
+        st.metric("seuil décisionnel :", 0.3)
+        
+    with col2:
+        st.header("Données clients")
+        st.metric("Nombre de demandes : ", f"{metrics['nb_clients']}")
+        st.metric("Crédits accordés : ", f"{metrics['nb_accord']*100/metrics['nb_clients']:.2f}%")        
+        st.metric("Crédits refusés : ", f"{metrics['nb_refus']*100/metrics['nb_clients']:.2f}%")
+        st.metric("taux d'endettement moyen : ", f"{metrics['global_amt_endettement_mean']:.2f}%")
+
+# /////////////////////////////////
+# extrait du fichier client
+# /////////////////////////////////

@@ -27,7 +27,7 @@ import pandas as pd
 import shap
 import io
 from loguru import logger
-from Scripts.App.utils import features_mapping, compute_metrics
+from utils import features_mapping, compute_metrics
 import numpy as np
 import traceback
 

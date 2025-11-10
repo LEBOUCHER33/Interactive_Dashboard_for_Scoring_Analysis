@@ -174,13 +174,10 @@ async def metrics(file_csv: UploadFile = File(...),
     try:
         content = await file_csv.read()
         df = pd.read_csv(io.BytesIO(content))
-
         if df.empty :
             return JSONResponse(status_code=400, content={"error": "Le fichier est vide."})
-        data = pd.DataFrame(df)
-        data = data.replace({np.nan: None, np.inf: None, -np.inf: None})
         # calcul des métriques
-        metrics = compute_metrics(df=data, 
+        metrics = compute_metrics(df=df, 
                                   model_pipeline=model_pipeline,
                                   features_mapping=features_mapping,
                                   explainer=explainer,

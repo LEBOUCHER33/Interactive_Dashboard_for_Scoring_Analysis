@@ -38,7 +38,7 @@ logger.add("logs/request_api_debug.log", format="{time} {level} {message}", leve
 
 # definir les url de l'api
 
-USE_RENDER = True  # False = local, True = Render
+USE_RENDER = False  # False = local, True = Render
 
 
 if USE_RENDER:
@@ -46,13 +46,19 @@ if USE_RENDER:
 else:
     API_URL = "http://127.0.0.1:8000"
 
-url_predict_cloud = f"{API_URL}/predict"
-url_predict_local = f"{API_URL}/predict"
+# Endpoints
+url_predict = f"{API_URL}/predict"
+url_metrics = f"{API_URL}/metrics"
 
+# Test de connexion à l'API
 try:
-    requests.get(API_URL)
-except requests.exceptions.ConnectionError:
-    print("❌ Impossible de se connecter à l’API.")
+    healthcheck = requests.get(f"{API_URL}/docs", timeout=300)
+    if healthcheck.status_code in (200, 404):
+        print(f"Connexion réussie à l API : {API_URL}")
+    else:
+        print(f"L’API a répondu avec le code {healthcheck.status_code}")
+except requests.exceptions.RequestException:
+    print("❌ Impossible de se connecter à l API.")
     print(traceback.format_exc())
     exit()
 
@@ -75,7 +81,7 @@ logger.debug(f"Donnees converties en format JSON pour l'API :\n{data_json}")
 
 
 try:
-    response = requests.post(url_predict_cloud, 
+    response = requests.post(url_predict, 
                              headers={"Content-Type": "application/json"}, 
                              json=data_json)
     response.raise_for_status()  # lever une erreur pour les codes de statut 4xx/5xx
@@ -114,7 +120,7 @@ try:
     with open(file_path, "rb") as file:
         files = {"file_csv": (file_path, file, "text/csv")}
         params = {"sample_size": sample_size}
-        response = requests.post(url_metrics_cloud, files=files, params=params)
+        response = requests.post(url_metrics, files=files, params=params, timeout=500)
     response.raise_for_status()
     logger.info("Requete POST envoyee avec succes a l'API.")
     results = response.json()

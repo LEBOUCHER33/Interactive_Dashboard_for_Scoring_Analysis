@@ -12,6 +12,8 @@ et des noms descriptifs explicites
 # ////////////////////////////////
 
 import pandas as pd
+import numpy as np
+
 
 
 # ///////////////////////////////
@@ -174,6 +176,8 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
     # data
     if sample_size is not None and sample_size < len(df):
         df = df.sample(n=sample_size, random_state=42)
+    
+    df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
     # calcul des predictions
     prediction = model_pipeline.predict(df) # score (0, 1)
     prediction_proba = model_pipeline.predict_proba(df)[:,1] # proba d'être 1
@@ -189,24 +193,22 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
         # mapping
         features_mapped = {features_mapping(f): v for f, v in top_5_features}
         explanations.append(features_mapped)
-    # calcul des metriques
-    score_moy = float(prediction.mean())
-    taux_accord = float(prediction_proba_seuil.mean())
     # calcul des stats
     score_moy = float(prediction.mean())
-    taux_accord = float(prediction_proba_seuil.mean())
+    taux_refus = float(prediction_proba_seuil.mean())
+    taux_accord = float(1-taux_refus)
     risk_moy_fn = float(1753/61503) # FN/total predictions
     seuil_decisionnel = float(0.3)
     drift = float(0.17)
     # stats BD
     nb_clients = int(len(df)) 
-    age_moye_client = float(df["DAYS_BIRTH"].mean())
-    nb_accord = int(len(prediction[prediction==1]))
-    nb_refus = int(len(prediction[prediction==0]))
-    global_amt_endettement_mean = float(df["APP_CREDIT_PERC_mean"].mean())
+    age_moye_client = float(df["DAYS_BIRTH"].mean() / 365)
+    nb_refus = int(len(prediction[prediction==1]))
+    nb_accord = int(len(prediction[prediction==0]))
     # resultats
     metrics = {
         "score_moy": round(score_moy,3),
+        "taux_refus": round(taux_refus,2),
         "taux_accord": round(taux_accord,2),
         "risk_moy_fn": round(risk_moy_fn,2),
         "drift": drift,
@@ -215,7 +217,6 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
         "age_moye_client": round(age_moye_client,1),
         "nb_accord": nb_accord,
         "nb_refus": nb_refus,
-        "global_amt_endettement_mean": round(global_amt_endettement_mean,2),
         "top_features": explanations
     }
     return metrics

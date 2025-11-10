@@ -53,14 +53,18 @@ import requests
 # 2- Paramètres
 # /////////////////////////////////////////
 
-url_cloud = "https://client-scoring-model.onrender.com"
-url_local = "http://127.0.0.1:8000"
-url_predict_cloud = f"{url_cloud}/predict"
-url_predict_local = f"{url_local}/predict"
-url_metrics_cloud = f"{url_cloud}/metrics"
-url_metrics_local = f"{url_local}/metrics"
+USE_RENDER = False  # False = local, True = Render
+if USE_RENDER:
+    API_URL = "https://client-scoring-model.onrender.com"
+else:
+    API_URL = "http://127.0.0.1:8000"
 
-file_path = "../../Data/Data_cleaned/application_test_final.csv"
+# Endpoints
+url_predict = f"{API_URL}/predict"
+url_metrics = f"{API_URL}/metrics"
+
+
+file_path = "./Data/Data_cleaned/application_test_final.csv"
 data = pd.read_csv(file_path)
 sample_size = len(data)
 
@@ -91,20 +95,16 @@ with open(file_path, "rb") as file:
     with open(file_path, "rb") as file:
         files = {"file_csv": (file_path, file, "text/csv")}
         params = {"sample_size": sample_size}
-        response = requests.post(url_metrics_local, files=files, params=params)
+        response = requests.post(url_metrics, files=files, params=params)
 if response.status_code == 200:
     logger.info("Requete POST envoyee avec succes a l'API.")
     metrics = response.json()  
     # affichage
-    for key, value in metrics.items():
-        if key != "top_features":
-            st.metric(key, value)
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Indicateurs de performance")
-        st.metric("Risque moyen par client d'un FN :", f"{metrics['risk_moy_fn']*100:.2f}%")
-        st.metric("Score moyen global :", f"{metrics['score_moy']*100:.2f}%")
-        st.metric("Taux d'accord moyen :", f"{metrics['taux_accord']*100:.2f}%")
+        st.metric("Risque moyen par client de non-solvabilité :", f"{metrics['risk_moy_fn']*100:.2f}%")
+        st.metric("Score moyen global :", f"{metrics['score_moy']}")
         st.metric("data_drift :", "Stable")
         st.metric("seuil décisionnel :", 0.3)
         
@@ -113,13 +113,13 @@ if response.status_code == 200:
         st.metric("Nombre de demandes : ", f"{metrics['nb_clients']}")
         st.metric("Crédits accordés : ", f"{metrics['nb_accord']*100/metrics['nb_clients']:.2f}%")        
         st.metric("Crédits refusés : ", f"{metrics['nb_refus']*100/metrics['nb_clients']:.2f}%")
-        st.metric("taux d'endettement moyen : ", f"{metrics['global_amt_endettement_mean']:.2f}%")
+        st.metric("Taux d'accord moyen :", f"{metrics['taux_accord']*100:.2f}%")
 
 # ////////////////////////////////////
 # extrait du fichier client
 # ////////////////////////////////////
 
-st.markdown(f"Uploading de la Base de Données clients ({sample_size} clients")
+st.markdown(f"Uploading de la Base de Données clients ({sample_size} clients)")
 st.write(data.head(5))
 
 
@@ -127,11 +127,3 @@ st.write(data.head(5))
 # //////////////////////////////////
 # sélection du client
 # //////////////////////////////////
-
-st.subheader("👤 Sélectionner un client pour l’analyse individuelle")
-if "SK_ID_CURR" in data.columns:
-    client_id = st.selectbox("Choisissez un identifiant client :", data["SK_ID_CURR"].unique())
-    st.write(f"Client sélectionné : {client_id}")
-    st.page_link("pages/dashboard_client.py", label="➡️ Aller à l'analyse du client sélectionné", icon="🔎")
-else:
-    st.warning("⚠️ Colonne `SK_ID_CURR` absente du jeu de données.")

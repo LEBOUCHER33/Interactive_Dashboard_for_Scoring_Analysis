@@ -54,14 +54,14 @@ Résultats attendus :
 
 ## Maquette du dashboard
 
-1- Vue statistique globale du modèle (top bar):
+1- Vue statistique globale du modèle (page_1/top bar):
 
     - nbre total des demandes et répartition des taux acceptation / refus
     - indicateurs de performance du modèle : drift / taux d'erreur / score_moyen_client
     - feature importance globale
 
 
-2- identification du client (side bar):
+2- identification du client (page_2side bar):
 
     - sélection d'un client via un ID 
     - score de solvabilité du client + décision
@@ -70,7 +70,7 @@ Résultats attendus :
 
        
 
-3- visualisation de la prédiction (central bar) :
+3- visualisation de la prédiction (page_2/central bar) :
     
     - explicabilité locale : visualisation des principales features influentes sur la prédiction
     - graphs du profil de risque du client : 

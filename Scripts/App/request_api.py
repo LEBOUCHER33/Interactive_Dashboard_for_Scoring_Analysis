@@ -63,7 +63,7 @@ logger.debug(f"Donnees converties en format JSON pour l'API :\n{data_json}")
 
 
 try:
-    response = requests.post(url_local, 
+    response = requests.post(url_cloud, 
                              headers={"Content-Type": "application/json"}, 
                              json=data_json)
     response.raise_for_status()  # lever une erreur pour les codes de statut 4xx/5xx
@@ -100,7 +100,7 @@ try:
     with open(file_path, "rb") as file:
         files = {"file_csv": (file_path, file, "text/csv")}
         params = {"sample_size": sample_size}
-        response = requests.post(url_metrics_local, files=files, params=params)
+        response = requests.post(url_metrics_cloud, files=files, params=params)
     response.raise_for_status()
     logger.info("Requete POST envoyee avec succes a l'API.")
     results = response.json()

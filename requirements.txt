@@ -18,3 +18,5 @@ streamlit
 # outil de gestion de l'API
 fastapi
 uvicorn
+
+loguru

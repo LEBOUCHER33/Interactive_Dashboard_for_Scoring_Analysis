@@ -58,7 +58,7 @@ url_cloud = "https://client-scoring-model.onrender.com/predict"
 url_local = "http://127.0.0.1:8000/predict"
 url_metrics_cloud = "https://client-scoring-model.onrender.com/metrics"
 url_metrics_local = "http://127.0.0.1:8000/metrics"
-sample_size = 10000
+sample_size = len(data)
 file_path = "../Data/Data_cleaned/application_test_final.csv"
 data = pd.read_csv(file_path)
 
@@ -83,6 +83,7 @@ st.header("Outil métier d'aide à la décision pour l'octroi d'un crédit à la
 # calcul et affichage des métriques globales de performance du modèle
 # //////////////////////////////////////////////////////////////////////
 
+st.markdown(f"Uploading de la Base de Données clients ({sample_size} clients")
 
 with open(file_path, "rb") as file:
     with open(file_path, "rb") as file:

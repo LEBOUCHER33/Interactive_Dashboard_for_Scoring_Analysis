@@ -30,5 +30,5 @@ EXPOSE 8000
 
 # execution de l'application lors du lancement du conteneur
 WORKDIR /app
-CMD ["python", "-m", "uvicorn", "Scripts.App.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "Scripts.App.api:app", "--host", "0.0.0.0", "--port", "10000"]
 

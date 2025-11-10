@@ -16,6 +16,9 @@ import requests
 import pandas as pd
 import numpy as np
 from loguru import logger
+import traceback
+
+
 
 # ajouter un logger d'information
 logger.add("logs/request_api.log", format="{time} {level} {message}", level="INFO", retention="10 days", compression="zip")
@@ -33,15 +36,21 @@ logger.add("logs/request_api_debug.log", format="{time} {level} {message}", leve
 # /////////////////////////////////////////////
 
 
-# definir l'url de l'api
-url_cloud = "https://client-scoring-model.onrender.com/predict"
+# definir les url de l'api
+url_cloud = "https://client-scoring-model.onrender.com"
+url_local = "http://127.0.0.1:8000"
+
+url_predict_local = f"{url_local}/predict"
+url_predict_cloud = f"{url_cloud}/predict"
+
 logger.info(f"Demarrage du script de test de l'api de scoring, URL de l'API: {url_cloud}")
-url_local = "http://127.0.0.1:8000/predict"
+
 
 try:
     requests.get("http://127.0.0.1:8000")
 except requests.exceptions.ConnectionError:
-    print("❌ Impossible de se connecter à l’API. Vérifie qu’elle est bien lancée.")
+    print("❌ Impossible de se connecter à l’API.")
+    print(traceback.format_exc())
     exit()
 
 
@@ -63,7 +72,7 @@ logger.debug(f"Donnees converties en format JSON pour l'API :\n{data_json}")
 
 
 try:
-    response = requests.post(url_cloud, 
+    response = requests.post(url_predict_cloud, 
                              headers={"Content-Type": "application/json"}, 
                              json=data_json)
     response.raise_for_status()  # lever une erreur pour les codes de statut 4xx/5xx
@@ -86,8 +95,9 @@ logger.add("logs/request_metrics_error.log", format="{time} {level} {message}", 
 
 # définir les paramètres
 
-url_metrics_cloud = "https://client-scoring-model.onrender.com/metrics"
-url_metrics_local = "http://127.0.0.1:8000/metrics" 
+url_metrics_cloud = f"{url_cloud}/metrics"
+url_metrics_local = f"{url_local}/metrics"
+
 
 file_path = "./Data/Data_cleaned/application_test_final.csv"
 logger.info(f"Test du endpoint /metrics avec le fichier {file_path}")

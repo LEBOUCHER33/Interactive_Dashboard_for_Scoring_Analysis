@@ -111,7 +111,7 @@ if response.status_code == 200:
         st.metric("seuil décisionnel :", 0.3)    
     with col2:
         st.image(f"{API_URL}/Metrics/global_shap.png",
-                 caption="Features Importance Global")
+                 caption="Features Importance Globale")
     with col3:
         st.subheader("Données clients")
         st.metric("Nombre de demandes : ", f"{metrics['nb_clients']}")

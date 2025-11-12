@@ -102,13 +102,6 @@ except requests.exceptions.RequestException as e:
 logger.add("logs/request_api_metrics.log", format="{time} {level} {message}", level="INFO", retention="10 days", compression="zip")
 logger.add("logs/request_metrics_error.log", format="{time} {level} {message}", level="ERROR", retention="10 days")
 
-# définir les paramètres
-
-url_metrics_cloud = f"{API_URL}/metrics"
-url_metrics_local = f"{API_URL}/metrics"
-
-
-
 file_path = "./Data/Data_cleaned/application_test_final.csv"
 logger.info(f"Test du endpoint /metrics avec le fichier {file_path}")
 
@@ -120,7 +113,7 @@ try:
     with open(file_path, "rb") as file:
         files = {"file_csv": (file_path, file, "text/csv")}
         params = {"sample_size": sample_size}
-        response = requests.post(url_metrics, files=files, params=params, timeout=500)
+        response = requests.get(url_metrics)
     response.raise_for_status()
     logger.info("Requete POST envoyee avec succes a l'API.")
     results = response.json()

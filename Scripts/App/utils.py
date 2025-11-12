@@ -4,7 +4,7 @@ Script pour implémenter les fonctions utilitaires de l'API
 1- fonction de calcul des predictions sur le dataset de test et des principales indicateurs
 
 2- fonction de mapping pour définir un dictionnaire de correspondance entre les features du df
-et des noms descriptifs explicites 
+et des noms descriptifs explicites
 """
 
 # ////////////////////////////////
@@ -13,8 +13,9 @@ et des noms descriptifs explicites
 
 import pandas as pd
 import numpy as np
-
-
+import shap
+import matplotlib.pyplot as plt
+import os
 
 # ///////////////////////////////
 # dictionnaire de mapping
@@ -131,9 +132,6 @@ feature_mapping = {
     "FLAG_WORK_PHONE": "Téléphone professionnel actif"
     }
 
-
-
-
 # ///////////////////////////////////////
 # Fonction de mapping des features
 # ///////////////////////////////////////
@@ -141,7 +139,7 @@ feature_mapping = {
 def features_mapping(feature : str, feature_mapping : dict = feature_mapping) -> str:
     """
     _Summary_: Fonction qui mappe les noms des variables en noms explicites
-    _Args_: 
+    _Args_:
         - feature : str
         - feature_mapping : dict
     _Returns_:
@@ -150,14 +148,13 @@ def features_mapping(feature : str, feature_mapping : dict = feature_mapping) ->
 
     return feature_mapping.get(feature, feature)
 
-
-
 # /////////////////////////////////////////////
 # 1- Fonction de calcul des predictions
 # /////////////////////////////////////////////
 
+output_dir =  "./Scripts/App"
 
-def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : object, 
+def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : object,
                      features_mapping = features_mapping, sample_size : int = 10000):
     """
     _Summary_ : Calcul des indicateurs clés d'un dataframe d'une BD clients
@@ -166,23 +163,23 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
         model_pipeline (object): _pipeline de prédiction entrainé_
         explainer (object): _objet shap déjà initialisé_
         features_mapping (dict): _fonction de mapping des features_
-        sample_size (int, optional): _taille de l'échantillon à utiliser pour le calcul des indicateurs. 
+        sample_size (int, optional): _taille de l'échantillon à utiliser pour le calcul des indicateurs.
                                     Par défaut à 10000_
     _Returns_:
-        _dict_: 
+        _dict_:
             - métriques principales calculées
             - top features SHAP
     """
     # data
-    if sample_size is not None and sample_size < len(df):
+    if sample_size is not None and sample_size <= len(df):
         df = df.sample(n=sample_size, random_state=42)
-    
+
     df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
     # calcul des predictions
     prediction = model_pipeline.predict(df) # score (0, 1)
     prediction_proba = model_pipeline.predict_proba(df)[:,1] # proba d'être 1
     prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # proba d'être 1 avec un seuil plus stringent
-    # explainabilite 
+    # explainabilite
     data_transformed = model_pipeline.named_steps['preprocessor'].transform(df)
     shap_expl = explainer(data_transformed)
     shap_values = shap_expl.values
@@ -193,6 +190,16 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
         # mapping
         features_mapped = {features_mapping(f): v for f, v in top_5_features}
         explanations.append(features_mapped)
+    # graph shap_plot
+    shap_plot_path = "./Metrics/gloabl_shap.png"
+    os.makedirs(os.path.dirname(shap_plot_path), exist_ok=True)
+    plt.figure(figsize=(10,6))
+    shap.summary_plot(shap_values, 
+                      features=df,
+                      feature_names=df.columns,
+                      show=False)
+    plt.savefig(shap_plot_path, bbox_inches='tight', dpi=150)
+    plt.close
     # calcul des stats
     score_moy = float(prediction.mean())
     taux_refus = float(prediction_proba_seuil.mean())
@@ -201,7 +208,7 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
     seuil_decisionnel = float(0.3)
     drift = float(0.17)
     # stats BD
-    nb_clients = int(len(df)) 
+    nb_clients = int(len(df))
     age_moye_client = float(df["DAYS_BIRTH"].mean() / 365)
     nb_refus = int(len(prediction[prediction==1]))
     nb_accord = int(len(prediction[prediction==0]))
@@ -217,10 +224,12 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
         "age_moye_client": round(age_moye_client,1),
         "nb_accord": nb_accord,
         "nb_refus": nb_refus,
-        "top_features": explanations
+        "top_features": explanations,
+        "shap_plot_path": shap_plot_path
     }
     return metrics
 
-
-
+# /////////////////////////////////////////////////////
+# fonction de generation d'un graph shap explainer
+# /////////////////////////////////////////////////////
 

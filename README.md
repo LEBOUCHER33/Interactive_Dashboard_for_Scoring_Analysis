@@ -23,7 +23,9 @@ Ce dashboard devra permettre au personnel de la banque la restitution métier de
 2- développer un dashboard interactif :
     - définir les spécifications du dashboard
     - élaborer la maquette du dashboard avec excalidraw
-    - implémenter le script Streamlit de développement du dashboard
+    - implémenter les scripts :
+        -update des scripts python relatifs à l api
+        -implementation des scripts Streamlit de développement du dashboard
     - organiser les éléments du dashboard et les graphs
     - intégrer l'api
     - tester le dashboard en local

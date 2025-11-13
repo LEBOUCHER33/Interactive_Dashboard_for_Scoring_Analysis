@@ -18,8 +18,7 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # copie du script lié à l'application
-COPY Scripts/App/api.py ./Scripts/App/api.py
-COPY Scripts/App/utils.py ./Scripts/App/utils.py
+COPY . .
 
 
 # copie du pipeline et du modèle entrainé

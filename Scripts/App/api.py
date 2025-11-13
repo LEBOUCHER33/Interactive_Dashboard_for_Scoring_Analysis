@@ -40,6 +40,7 @@ from loguru import logger
 from Scripts.App.utils import features_mapping, compute_metrics
 import numpy as np
 import traceback
+import matplotlib.pyplot as plt
 
 # //////////////////////////////////////////////////
 # loading des data
@@ -149,12 +150,23 @@ async def predict(data : list[dict] | dict):
         features_shap_mapped = {features_mapping(f): v for f, v in features_shap.items()}
         top_5_features = sorted(features_shap_mapped.items(), key=lambda x: abs(x[1]), reverse=True)[:5]  # on trie les features par valeur absolue de SHAP et on prend les 5 premières
         explanation.append(top_5_features)
+    shap_plot_local = "./Metrics/Shap_local_plot"
+    plt.figure(figsize=(10,6))
+    shap.summary_plot(shap_values,
+                      features=input_data,
+                      feature_name=input_data.columns,
+                      show=False
+                      )
+    plt.savefig(shap_plot_local,
+                bbox_inches = 'tight',
+                dpi=150)    
     # retourner la prédiction et la probabilité associée
     return {
         "prediction": prediction.tolist(),
         "probabilite_1": prediction_proba.tolist(),
         "prediction_seuil" : prediction_proba_seuil.tolist(),
-        "top_features": explanation 
+        "top_features": explanation,
+        "shap_plot": shap_plot_local 
     }
 
 

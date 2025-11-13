@@ -14,6 +14,7 @@ import requests
 # /////////////////////////////////////////
 # 2- Paramètres
 # /////////////////////////////////////////
+
 # url
 USE_RENDER = False  # False = local, True = Render
 if USE_RENDER:
@@ -31,6 +32,7 @@ data = pd.read_csv(file_path)
 # /////////////////////////////////////////
 # 3- Conception de la page 2
 # /////////////////////////////////////////
+
 st.set_page_config(page_title='Client Details', layout='wide')
 st.title("Analyse client individuelle")
 
@@ -71,3 +73,16 @@ if st.button("Obtenir les prédictions"):
             st.error(f"Une erreur est survenue: {str(e)}")
     else:
         st.warning("Aucun client trouvé avec cet ID")
+
+# affichage des resultats
+
+# side_bar
+
+st.sidebar.header("Informations du client")
+st.sidebar.write(f"score : {prediction['prediction']}")
+st.sidebar.write(f"probabilite non-solvabilite : {prediction["prediction_seuil"]}")
+st.sidebar.write(f"Age : {data_client['DAYS_BIRTH']/365}")
+st.sidebar.write(f"Montant du credit demande : {data_client['AMT_CREDIT']}")
+st.sidebar.write(f"Taux d'apport moyen : {data_client["RATE_DOWN_PAYMENT_mean"]}")
+
+# main_bar

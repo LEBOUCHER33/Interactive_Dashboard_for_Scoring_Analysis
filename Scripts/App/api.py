@@ -172,11 +172,16 @@ async def predict(data : list[dict] | dict):
         explanation.append(top_5_features)
     shap_plot_local = f"./Metrics/shap_local_{uuid.uuid4().hex}.png"
     os.makedirs("./Metrics", exist_ok=True)
+    base_value = local_shap_explainer.expected_value[1]
+    mapped_features = [features_mapping(col) for col in input_data.columns]
     plt.figure(figsize=(10,6))
-    shap.force_plot(shap_values,
-                      input_data,
-                      show=False
-                      )
+    shap.force_plot(base_value,
+                    shap_values[1],
+                    features=input_data,
+                    feature_names=mapped_features,
+                    matplotlib=True,
+                    show=False
+                    )
     plt.savefig(shap_plot_local,
                 bbox_inches = 'tight',
                 dpi=150)    
@@ -204,7 +209,7 @@ async def metrics(refresh:bool = False):
     global CACHED_METRICS
     if refresh or CACHED_METRICS is None:
         print("Recalcul des métriques à la demande.")
-        CACHED_METRICS = compute_metrics(df=df, 
+        CACHED_METRICS = compute_metrics(df=df.sample(n=10000),  # pour accélérer le calcul
                                          model_pipeline=model_pipeline,
                                           explainer=global_explainer,
                                           features_mapping=features_mapping,

@@ -55,10 +55,10 @@ feature_mapping = {
     "DAYS_REGISTRATION": "Ancienneté d’enregistrement au domicile (jours)",
     "DAYS_LAST_PHONE_CHANGE": "Délai depuis le dernier changement de téléphone (jours)",
     # --- Données de logement ---
-    "HOUSETYPE_MODE_block of flats": "Type de logement : immeuble collectif",
-    "HOUSETYPE_MODE_nan": "Type de logement inconnu",
-    "NAME_HOUSING_TYPE_With parents": "Type de logement : avec les parents",
-    "NAME_HOUSING_TYPE_House / apartment": "Type de logement : maison/appartement",
+    "HOUSETYPE_MODE_block of flats": "Type de logement : immeuble collectif (indicateur valeur immo)",
+    "HOUSETYPE_MODE_nan": "Type de logement inconnu (indicateur valeur immo)",
+    "NAME_HOUSING_TYPE_With parents": "Type de logement : hebergement chez parents (indicateur valeur immo)",
+    "NAME_HOUSING_TYPE_House / apartment": "Type de logement : maison/appartement (indicateur valeur immo)",
     "TOTALAREA_MODE": "Surface totale du logement",
     "LIVINGAREA_AVG": "Surface moyenne habitable",
     "LIVINGAREA_MEDI": "Surface médiane habitable",
@@ -72,9 +72,9 @@ feature_mapping = {
     "FLOORSMIN_AVG": "Étage minimum moyen",
     "FLOORSMIN_MEDI": "Étage minimum médian",
     "FLOORSMIN_MODE": "Étage minimum mode",
-    "ELEVATORS_AVG": "Présence d’ascenseurs (moy)",
-    "ELEVATORS_MEDI": "Présence d’ascenseurs (med)",
-    "ELEVATORS_MODE": "Présence d’ascenseurs (mode)",
+    "ELEVATORS_AVG": "ascenseurs / indicateur valeur immo (moy)",
+    "ELEVATORS_MEDI": "ascenseurs / indicateur valeur immo (med)",
+    "ELEVATORS_MODE": "ascenseurs / indicateur valeur immo (mode)",
     "WALLSMATERIAL_MODE_Panel": "Matériau des murs : panneau",
     "WALLSMATERIAL_MODE_nan": "Matériau des murs : inconnu",
     "FONDKAPREMONT_MODE_nan": "Type de fonds de rénovation inconnu",
@@ -189,12 +189,14 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
         features_mapped = {features_mapping(f): v for f, v in top_5_features}
         explanations.append(features_mapped)
     # graph shap_plot
-    shap_plot_path = "./Metrics/gloabl_shap.png"
+    shap_plot_path = "./Metrics/global_shap.png"
     os.makedirs("./Metrics", exist_ok=True)
+    column_names = df.columns.tolist()
+    renamed_columns = [features_mapping(f) for f in column_names]
     plt.figure(figsize=(10,6))
     shap.summary_plot(shap_values, 
                       features=data_transformed,
-                      feature_names=df.columns,
+                      feature_names=renamed_columns,
                       show=False)
     plt.savefig(shap_plot_path, bbox_inches='tight', dpi=150)
     plt.close

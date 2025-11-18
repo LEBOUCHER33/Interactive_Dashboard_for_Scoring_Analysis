@@ -47,8 +47,7 @@ import pandas as pd
 import numpy as np
 from loguru import logger
 import requests
-
-
+from streamlit_extras.switch_page_button import switch_page 
 
 
 # /////////////////////////////////////////
@@ -92,17 +91,34 @@ st.header("Outil métier d'aide à la décision pour l'octroi d'un crédit à la
 # calcul et affichage des métriques globales de performance du modèle
 # //////////////////////////////////////////////////////////////////////
 
-st.title("Tableau de bord - Indicateurs Globaux")
-if st.button("Rafraichir les métriques"):
-    response = requests.get(url_metrics, refresh=True)
-else:
-    response = requests.get(url_metrics)
-if response.status_code == 200:
-    logger.info("Requete POST envoyee avec succes a l'API.")
-    metrics = response.json()  
-    st.json(metrics)
+st.header("Tableau de bord - Indicateurs Globaux")
+
+def get_global_metrics(refresh: bool = False):
+    """
+    _Summary_: Récupération des métriques globales du modèle via l'API.
+    _Args_:
+        refresh (bool): Recalcul des métriques. Par défaut False.
+    _Returns_:
+        dict: métriques globales ou None si erreur
+    """
+    try:
+        params = {"refresh": True} if refresh else {}
+        response = requests.get(url_metrics, params=params, timeout=300)
+        response.raise_for_status()  # lève une exception pour les codes 4xx/5xx
+        logger.info("Requête GET envoyée avec succès à l'API.")
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Erreur lors de la requête GET à l'API : {e}")
+        return None
+
+# Streamlit
+refresh_button = st.button("Refresh global metrics")
+metrics = get_global_metrics(refresh=refresh_button)
+
+
+if metrics is not None:  
     # affichage
-    col1, col2, col3 = st.columns(3)
+    col1, col_spacer, col2, col_spacer2, col3 = st.columns([1, 0.1, 1, 0.3, 1])
     with col1:
         st.subheader("Indicateurs de performance")
         st.metric("Risque moyen par client de non-solvabilité :", f"{metrics['risk_moy_fn']*100:.2f}%")
@@ -110,8 +126,9 @@ if response.status_code == 200:
         st.metric("data_drift :", "Stable")
         st.metric("seuil décisionnel :", 0.3)    
     with col2:
-        st.image(f"{API_URL}/Metrics/global_shap.png",
-                 caption="Features Importance Globale")
+        st.subheader("Explainabilité Globale")
+        st.image("./Metrics/global_shap.png",
+                 caption="Importance globale des features selon SHAP")
     with col3:
         st.subheader("Données clients")
         st.metric("Nombre de demandes : ", f"{metrics['nb_clients']}")
@@ -122,25 +139,23 @@ if response.status_code == 200:
 # ////////////////////////////////////
 # extrait du fichier client
 # ////////////////////////////////////
-
-if st.button("Refresh global metrics"):
-    response=requests.get(url_metrics, refresh=True)
-else:
-    response=requests.get(url_metrics)
-st.markdown(f"Uploading de la Base de Données clients ({sample_size} clients)")
-st.write(data.head(5))
+st.subheader("Extrait du fichier client")
+st.dataframe(data.head(10))
 
 # ////////////////////////////////
 # selection d'un client
 # ///////////////////////////////
 
 st.subheader("Sélection du client pour afficher les prédictions")
-client_ids = data['SK_ID_CUST'].astype(str).tolist()  
+client_ids = data['SK_ID_CURR'].astype(str).tolist()  
 selected_client_id = st.selectbox("Sélectionnez un ID client:", client_ids)
-
+# sauvegarde de l'ID client sélectionné dans l'état de la session
 st.session_state['selected_client_id'] = selected_client_id
 
 # bouton pour aller à la page client
 
 if st.button("Afficher les prédictions du client"):
-    st.switch_page("page_2_client_details.py")
+    st.session_state["Go_to_client_page"] = True
+    st.switch_page("page_2_client_details")
+else:
+    st.session_state["Go_to_client_page"] = False

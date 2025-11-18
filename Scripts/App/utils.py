@@ -155,7 +155,7 @@ def features_mapping(feature : str, feature_mapping : dict = feature_mapping) ->
 output_dir =  "./Scripts/App"
 
 def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : object,
-                     features_mapping = features_mapping, sample_size : int = 10000):
+                     features_mapping = features_mapping, sample_size : int = 1000):
     """
     _Summary_ : Calcul des indicateurs clés d'un dataframe d'une BD clients
     _Args_:
@@ -171,9 +171,8 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
             - top features SHAP
     """
     # data
-    if sample_size is not None and sample_size <= len(df):
+    if sample_size and sample_size <= len(df):
         df = df.sample(n=sample_size, random_state=42)
-
     df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
     # calcul des predictions
     prediction = model_pipeline.predict(df) # score (0, 1)
@@ -181,8 +180,7 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
     prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # proba d'être 1 avec un seuil plus stringent
     # explainabilite
     data_transformed = model_pipeline.named_steps['preprocessor'].transform(df)
-    shap_expl = explainer(data_transformed)
-    shap_values = shap_expl.values
+    shap_values = explainer.shap_values(data_transformed)
     explanations = []
     for i in range(len(df)):
         features_shap = dict(zip(df.columns, shap_values[i].tolist()))  # on associe chaque feature à sa valeur SHAP
@@ -192,10 +190,10 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
         explanations.append(features_mapped)
     # graph shap_plot
     shap_plot_path = "./Metrics/gloabl_shap.png"
-    os.makedirs(os.path.dirname(shap_plot_path), exist_ok=True)
+    os.makedirs("./Metrics", exist_ok=True)
     plt.figure(figsize=(10,6))
     shap.summary_plot(shap_values, 
-                      features=df,
+                      features=data_transformed,
                       feature_names=df.columns,
                       show=False)
     plt.savefig(shap_plot_path, bbox_inches='tight', dpi=150)

@@ -35,37 +35,46 @@ from fastapi.responses import JSONResponse
 import pickle
 import pandas as pd
 import shap
-import io
 from loguru import logger
 from Scripts.App.utils import features_mapping, compute_metrics
-import numpy as np
-import traceback
 import matplotlib.pyplot as plt
+from contextlib import asynccontextmanager
+import os
+import uuid
+import numpy as np
 
 # //////////////////////////////////////////////////
 # loading des data
 # //////////////////////////////////////////////////
 
 df =  pd.read_csv("./Data/Data_cleaned/application_test_final.csv")
-
+df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
+df_sample = df.sample(n=10000, random_state=42)  # échantillon pour accélérer le calcul des métriques
 
 # //////////////////////////////////////////////////
 # loading du pipeline de prédiction
 # //////////////////////////////////////////////////
 
-
 with open("./Scripts/App/pipeline_final.pkl", "rb") as f:
     model_pipeline = pickle.load(f)
 
+preprocessor = model_pipeline.named_steps['preprocessor']
+model = model_pipeline.named_steps['model']
 
 # /////////////////////////////////////////////////
 # définition de l'explainabilité avec SHAP
 # /////////////////////////////////////////////////
 
-explainer = shap.TreeExplainer(model_pipeline.named_steps['model'])
-# sauvegarde de l'explainer
-with open("./Scripts/App/explainer.pkl", "wb") as f:
-    pickle.dump(explainer, f)
+
+# explainer global avec SHAP
+
+df_transformed = preprocessor.transform(df_sample)  # échantillon pour accélérer le calcul
+global_explainer = shap.TreeExplainer(model)
+# sauvegarde de l'explainer global
+with open("./Scripts/App/global_shap_explainer.pkl", "wb") as f:
+    pickle.dump(global_explainer, f)
+
+
 
 # /////////////////////////////////////////////////
 # implémentation de l'API avec FastAPI
@@ -92,17 +101,24 @@ def read_root():
 
 # calcul des metrics au start de l'api
 CACHED_METRICS = None
-@app.lifespan("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global CACHED_METRICS
     print("Pré-calcul des métriques globales...")
-    CACHED_METRICS = compute_metrics(
-        df=df,
-        model_pipeline=model_pipeline,
-        explainer=explainer,
-        features_mapping = features_mapping,
-        sample_size=len(df)
-    )
+    try:
+        CACHED_METRICS = compute_metrics(
+            df=df.sample(n=5000, random_state=42),  # pour accélérer le calcul au démarrage de l'api
+            model_pipeline=model_pipeline,
+            explainer=global_explainer,
+            features_mapping = features_mapping,
+            sample_size=len(df)
+        )
+        print("Métriques pré-calculées.")
+    except Exception as e:
+        print(f"Erreur lors du pré-calcul des métriques : {e}")
+    yield
+app = FastAPI(lifespan=lifespan)
+
 
 
 # /////////////////////////////////////////////////
@@ -135,14 +151,18 @@ async def predict(data : list[dict] | dict):
         input_data = pd.DataFrame(data)    # plusieurs individus
     else:
         return {"error": "Invalid input format"}
+    input_data = input_data.replace({None: np.nan, np.inf: np.nan, -np.inf: np.nan})
     # 3- faire la prédiction avec le pipeline chargé
     prediction = model_pipeline.predict(input_data)
     prediction_proba = model_pipeline.predict_proba(input_data)[:,1]  # probabilité d'être un mauvais payeur (classe 1)
     prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # inclus la notion de stringence avec un seuil pour minimiser les FN
     # 4- explainabilité avec SHAP
-    data_transformed = model_pipeline.named_steps['preprocessor'].transform(input_data)  # on applique le préprocesseur aux données d'entrée
-    shap_expl = explainer(data_transformed)  # on calcule les valeurs SHAP
-    shap_values = shap_expl.values # on extrait seulement les valeurs numériques
+    data_transformed = model_pipeline.named_steps['preprocessor'].transform(input_data)
+    local_shap_explainer = shap.TreeExplainer(model_pipeline, 
+                                             data=data_transformed,
+                                             feature_names=input_data.columns)
+    shap_values = local_shap_explainer.shap_values(data_transformed)
+    # on extrait seulement les valeurs numériques
     # on affiche les 5 features les plus importantes pour chaque individu
     explanation = []
     for i in range(len(input_data)):
@@ -150,11 +170,11 @@ async def predict(data : list[dict] | dict):
         features_shap_mapped = {features_mapping(f): v for f, v in features_shap.items()}
         top_5_features = sorted(features_shap_mapped.items(), key=lambda x: abs(x[1]), reverse=True)[:5]  # on trie les features par valeur absolue de SHAP et on prend les 5 premières
         explanation.append(top_5_features)
-    shap_plot_local = "./Metrics/Shap_local_plot"
+    shap_plot_local = f"./Metrics/shap_local_{uuid.uuid4().hex}.png"
+    os.makedirs("./Metrics", exist_ok=True)
     plt.figure(figsize=(10,6))
-    shap.summary_plot(shap_values,
-                      features=input_data,
-                      feature_name=input_data.columns,
+    shap.force_plot(shap_values,
+                      input_data,
                       show=False
                       )
     plt.savefig(shap_plot_local,
@@ -186,7 +206,7 @@ async def metrics(refresh:bool = False):
         print("Recalcul des métriques à la demande.")
         CACHED_METRICS = compute_metrics(df=df, 
                                          model_pipeline=model_pipeline,
-                                          explainer=explainer,
+                                          explainer=global_explainer,
                                           features_mapping=features_mapping,
                                           sample_size=len(df))
     return JSONResponse(status_code=200, content=CACHED_METRICS)

@@ -32,7 +32,7 @@ logger.add("logs/request_api_debug.log", format="{time} {level} {message}", leve
 
 
 # /////////////////////////////////////////////
-# 2-1 test du endpoint /predict 
+# 2-1 test de connexion à l'API 
 # /////////////////////////////////////////////
 
 
@@ -52,16 +52,20 @@ url_metrics = f"{API_URL}/metrics"
 
 # Test de connexion à l'API
 try:
-    healthcheck = requests.get(f"{API_URL}/docs", timeout=300)
+    healthcheck = requests.get(f"{API_URL}", timeout=300)
     if healthcheck.status_code in (200, 404):
         print(f"Connexion réussie à l API : {API_URL}")
     else:
-        print(f"L’API a répondu avec le code {healthcheck.status_code}")
+        print(f"API a répondu avec le code {healthcheck.status_code}")
 except requests.exceptions.RequestException:
     print("❌ Impossible de se connecter à l API.")
     print(traceback.format_exc())
     exit()
 
+
+# /////////////////////////////////////////////
+# 2-2 test du endpoint /predict 
+# /////////////////////////////////////////////
 
 # creer un dataframe d'exemple
 
@@ -84,11 +88,16 @@ try:
     response = requests.post(url_predict, 
                              headers={"Content-Type": "application/json"}, 
                              json=data_json)
-    response.raise_for_status()  # lever une erreur pour les codes de statut 4xx/5xx
+    response.raise_for_status()  # lever une erreur pour les codes de statut 4xx/5xx et afficher l'erreur
     logger.info("Requete POST envoyee avec succes a l'API.")
     print(f"Reponse de l'API : {response.json()}, status code : {response.status_code}")
+except requests.exceptions.HTTPError as http_err:
+    logger.error(f"Erreur HTTP lors de l'envoi de la requete POST a l'API : {http_err}")
+    print(traceback.format_exc())
+    raise
 except requests.exceptions.RequestException as e:
     logger.error(f"Erreur lors de l'envoi de la requete POST a l'API : {e}")
+    print(traceback.format_exc())
     raise
 
 
@@ -110,12 +119,9 @@ sample_size = 50
 # test du endpoint
 
 try:
-    with open(file_path, "rb") as file:
-        files = {"file_csv": (file_path, file, "text/csv")}
-        params = {"sample_size": sample_size}
-        response = requests.get(url_metrics)
+    response = requests.get(url_metrics, timeout=300)
     response.raise_for_status()
-    logger.info("Requete POST envoyee avec succes a l'API.")
+    logger.info("Requete GET envoyee avec succes a l'API.")
     results = response.json()
     # Affichage partiel des résultats
     logger.info("=== Résumé des métriques ===")

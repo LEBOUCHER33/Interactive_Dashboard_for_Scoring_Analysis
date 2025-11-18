@@ -93,6 +93,7 @@ st.header("Outil métier d'aide à la décision pour l'octroi d'un crédit à la
 
 st.header("Tableau de bord - Indicateurs Globaux")
 
+@st.cache_data
 def get_global_metrics(refresh: bool = False):
     """
     _Summary_: Récupération des métriques globales du modèle via l'API.
@@ -113,7 +114,10 @@ def get_global_metrics(refresh: bool = False):
 
 # Streamlit
 refresh_button = st.button("Refresh global metrics")
-metrics = get_global_metrics(refresh=refresh_button)
+if refresh_button:
+    metrics = get_global_metrics(refresh=refresh_button)
+else:
+    metrics = get_global_metrics()
 
 
 if metrics is not None:  

@@ -21,9 +21,6 @@ RUN pip install -r requirements.txt
 COPY . .
 
 
-# copie du pipeline et du modèle entrainé
-COPY Scripts/App/pipeline_final.pkl ./Scripts/App/pipeline_final.pkl
-
 # expose le port local de l'api
 EXPOSE 8000
 

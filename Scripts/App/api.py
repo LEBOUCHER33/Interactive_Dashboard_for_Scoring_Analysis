@@ -42,10 +42,12 @@ from contextlib import asynccontextmanager
 import os
 import uuid
 import numpy as np
+import traceback
 
 # //////////////////////////////////////////////////
 # loading des data
 # //////////////////////////////////////////////////
+
 
 df =  pd.read_csv("./Data/Data_cleaned/application_test_final.csv")
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
@@ -57,9 +59,17 @@ df_sample = df.sample(n=10000, random_state=42)  # échantillon pour accélérer
 
 with open("./Scripts/App/pipeline_final.pkl", "rb") as f:
     model_pipeline = pickle.load(f)
+try:
+    logger.info("Pipeline de prédiction chargé avec succès.")
+except Exception as e:
+    logger.error(f"Erreur lors du chargement du pipeline de prédiction : {e}")
 
 preprocessor = model_pipeline.named_steps['preprocessor']
 model = model_pipeline.named_steps['model']
+try:
+    logger.info("Modèle de prédiction extrait du pipeline avec succès.")
+except Exception as e:
+    logger.error(f"Erreur lors de l'extraction du modèle du pipeline : {e}")    
 
 # /////////////////////////////////////////////////
 # définition de l'explainabilité avec SHAP
@@ -153,44 +163,112 @@ async def predict(data : list[dict] | dict):
         return {"error": "Invalid input format"}
     input_data = input_data.replace({None: np.nan, np.inf: np.nan, -np.inf: np.nan})
     # 3- faire la prédiction avec le pipeline chargé
+    try:
+        input_data = input_data.astype(df.dtypes.to_dict())
+    except Exception as e:
+        print(traceback.print_exc())
+        print(e)
+        logger.error(f"Erreur lors de la conversion des types de données : {e}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    client_ids = input_data['SK_ID_CURR'].astype(str).tolist()  
     prediction = model_pipeline.predict(input_data)
     prediction_proba = model_pipeline.predict_proba(input_data)[:,1]  # probabilité d'être un mauvais payeur (classe 1)
     prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # inclus la notion de stringence avec un seuil pour minimiser les FN
+    try:
+        prediction = prediction.astype(int)
+        prediction_proba = prediction_proba.astype(float)
+        prediction_proba_seuil = prediction_proba_seuil.astype(int)
+    except Exception as e:
+        print(traceback.print_exc())
+        print(e)
+        logger.error(f"Erreur lors de la conversion des types de prédiction : {e}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
     # 4- explainabilité avec SHAP
-    data_transformed = model_pipeline.named_steps['preprocessor'].transform(input_data)
-    local_shap_explainer = shap.TreeExplainer(model_pipeline, 
-                                             data=data_transformed,
-                                             feature_names=input_data.columns)
-    shap_values = local_shap_explainer.shap_values(data_transformed)
+    try:
+        with open("./Scripts/App/global_shap_explainer.pkl", "rb") as f:
+            global_explainer = pickle.load(f)
+    except Exception as e:
+        logger.error("Erreur lors du preprocessing avant SHAP : %s", e)
+        logger.error(traceback.format_exc())
+        return {"error": "Preprocessing error before SHAP", "detail": str(e)}
+    try:
+        data_transformed = model_pipeline.named_steps['preprocessor'].transform(input_data)
+    except Exception as e:
+        print(traceback.print_exc())
+        print(e)
+        logger.error(f"Erreur lors de la transformation des données d'entrée : {e}")
+        return {"error": "Data transformation error", "detail": str(e)}
+    try:
+        shap_values_all = global_explainer.shap_values(data_transformed)
+        # pour les modèles de classification, shap_values_all est une liste avec une entrée par classe
+    except Exception as e:
+        print(traceback.print_exc())
+        print(e)
+        logger.error(f"Erreur lors de la conversion des valeurs SHAP en array numpy : {e}")
+        return {"error": "SHAP values conversion error"}
     # on extrait seulement les valeurs numériques
     # on affiche les 5 features les plus importantes pour chaque individu
     explanation = []
     for i in range(len(input_data)):
-        features_shap = dict(zip(input_data.columns, shap_values[i].tolist()))  # on associe chaque feature à sa valeur SHAP
+        features_shap = dict(zip(input_data.columns, shap_values_all[i].tolist()))  # on associe chaque feature à sa valeur SHAP
         features_shap_mapped = {features_mapping(f): v for f, v in features_shap.items()}
+        try:
+            features_shap_mapped = {k: float(v) for k, v in features_shap_mapped.items()}
+        except Exception as e:
+            print(traceback.print_exc())
+            print(e)
+            logger.error(f"Erreur lors de la conversion des valeurs SHAP en float : {e}")
+            return {"error": "SHAP values float conversion error"}
         top_5_features = sorted(features_shap_mapped.items(), key=lambda x: abs(x[1]), reverse=True)[:5]  # on trie les features par valeur absolue de SHAP et on prend les 5 premières
+        top_real_features = sorted(features_shap.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
         explanation.append(top_5_features)
-    shap_plot_local = f"./Metrics/shap_local_{uuid.uuid4().hex}.png"
+        try:
+            explanation = [ [(feat, float(f"{val:.4f}")) for feat, val in exp] for exp in explanation]
+        except Exception as e:
+            print(traceback.print_exc())
+            print(e)
+            logger.error(f"Erreur lors de la conversion des valeurs SHAP explicatives : {e}")
+            return {"error": "SHAP explanation conversion error"}
+    shap_plot_local = f"./Metrics/shap_local_{client_ids}.png"
     os.makedirs("./Metrics", exist_ok=True)
-    base_value = local_shap_explainer.expected_value[1]
-    mapped_features = [features_mapping(col) for col in input_data.columns]
+    # plot SHAP local pour le premier individu
+    base_value = global_explainer.expected_value # base value pour la classe prédite
+    shap_values = shap_values_all[0]  # valeurs SHAP pour le premier individu et la classe prédite
+    feature_names = model_pipeline.named_steps["preprocessor"].get_feature_names_out()
+    mapped_features = [features_mapping(col) for col in feature_names]
+    try:
+        mapped_features = [str(feat) for feat in mapped_features]   
+    except Exception as e:
+        print(traceback.print_exc())
+        print(e)
+        logger.error(f"Erreur lors de la conversion des noms de features pour le plot SHAP : {e}")
+        return {"error": "Feature names conversion error for SHAP plot"}
     plt.figure(figsize=(10,6))
     shap.force_plot(base_value,
-                    shap_values[1],
-                    features=input_data,
+                    shap_values,
+                    features=data_transformed[0],
                     feature_names=mapped_features,
                     matplotlib=True,
                     show=False
                     )
     plt.savefig(shap_plot_local,
                 bbox_inches = 'tight',
-                dpi=150)    
+                dpi=150)
+    plt.close()
+    try:
+        shap_plot_local = str(shap_plot_local)
+    except Exception as e:
+        print(traceback.print_exc())
+        print(e)
+        logger.error(f"Erreur lors de la conversion du chemin du plot SHAP en string : {e}")
+        return {"error": "SHAP plot path conversion error"}   
     # retourner la prédiction et la probabilité associée
     return {
         "prediction": prediction.tolist(),
         "probabilite_1": prediction_proba.tolist(),
         "prediction_seuil" : prediction_proba_seuil.tolist(),
         "top_features": explanation,
+        "top_real_names" : top_real_features,
         "shap_plot": shap_plot_local 
     }
 
@@ -207,6 +285,10 @@ async def metrics(refresh:bool = False):
     _Return_ : JSONResponse 
     """
     global CACHED_METRICS
+    try:
+        logger.info("Requête GET reçue pour les métriques globales.")
+    except Exception as e:
+        logger.error(f"Erreur lors de la réception de la requête GET pour les métriques : {e}")
     if refresh or CACHED_METRICS is None:
         print("Recalcul des métriques à la demande.")
         CACHED_METRICS = compute_metrics(df=df.sample(n=10000),  # pour accélérer le calcul

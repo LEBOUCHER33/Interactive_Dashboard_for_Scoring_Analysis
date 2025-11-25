@@ -68,7 +68,10 @@ url_metrics = f"{API_URL}/metrics"
 # data
 file_path = "./Data/Data_cleaned/application_test_final.csv"
 data = pd.read_csv(file_path)
-sample_size = len(data)
+try:
+    logger.info("Données client chargées avec succès.")
+except Exception as e:
+    logger.error(f"Erreur lors du chargement des données client : {e}")
 
 
 
@@ -83,15 +86,15 @@ sample_size = len(data)
 
 st.set_page_config(page_title='Scoring Credit Dashboard', layout='wide')
 st.icon="📊"
-st.title("📊Credit Scoring Dashboard")
+st.title("📊 Tableau de bord du modèle de Scoring")
 
-st.header("Outil métier d'aide à la décision pour l'octroi d'un crédit à la consommation")
+st.info("Outil métier d'aide à la décision pour l'octroi d'un crédit à la consommation")
 
 # //////////////////////////////////////////////////////////////////////
 # calcul et affichage des métriques globales de performance du modèle
 # //////////////////////////////////////////////////////////////////////
 
-st.header("Tableau de bord - Indicateurs Globaux")
+st.header("Indicateurs clés du Modèle")
 
 @st.cache_data
 def get_global_metrics(refresh: bool = False):
@@ -113,7 +116,7 @@ def get_global_metrics(refresh: bool = False):
         return None
 
 # Streamlit
-refresh_button = st.button("Refresh global metrics")
+refresh_button = st.button("Rafraichir les métriques globales")
 if refresh_button:
     metrics = get_global_metrics(refresh=refresh_button)
 else:
@@ -122,44 +125,28 @@ else:
 
 if metrics is not None:  
     # affichage
-    col1, col_spacer, col2, col_spacer2, col3 = st.columns([1, 0.1, 1, 0.3, 1])
+    col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("Indicateurs de performance")
         st.metric("Risque moyen par client de non-solvabilité :", f"{metrics['risk_moy_fn']*100:.2f}%")
         st.metric("Score moyen global :", f"{metrics['score_moy']}")
-        st.metric("data_drift :", "Stable")
-        st.metric("seuil décisionnel :", 0.3)    
+        st.metric("Dérive des données :", "Stable")
+        st.metric("Seuil décisionnel :", 0.3)    
     with col2:
         st.subheader("Explainabilité Globale")
         st.image("./Metrics/global_shap.png",
                  caption="Importance globale des features selon SHAP")
-    with col3:
-        st.subheader("Données clients")
-        st.metric("Nombre de demandes : ", f"{metrics['nb_clients']}")
-        st.metric("Crédits accordés : ", f"{metrics['nb_accord']*100/metrics['nb_clients']:.2f}%")        
-        st.metric("Crédits refusés : ", f"{metrics['nb_refus']*100/metrics['nb_clients']:.2f}%")
-        st.metric("Taux d'accord moyen :", f"{metrics['taux_accord']*100:.2f}%")
+
+st.header("Caractéristiques du fichier client")
+# affichage des caractéristiques du fichier client
+st.metric("Nombre de demandes : ", f"{metrics['nb_clients']}")
+st.metric("Taux de crédits accordés : ", f"{metrics['nb_accord']*100/metrics['nb_clients']:.2f}%")        
+st.metric("Taux de crédits refusés : ", f"{metrics['nb_refus']*100/metrics['nb_clients']:.2f}%")
+st.metric("Taux d'accord moyen :", f"{metrics['taux_accord']*100:.2f}%")
 
 # ////////////////////////////////////
 # extrait du fichier client
 # ////////////////////////////////////
 st.subheader("Extrait du fichier client")
-st.dataframe(data.head(10))
+st.dataframe(data.head(3))
 
-# ////////////////////////////////
-# selection d'un client
-# ///////////////////////////////
-
-st.subheader("Sélection du client pour afficher les prédictions")
-client_ids = data['SK_ID_CURR'].astype(str).tolist()  
-selected_client_id = st.selectbox("Sélectionnez un ID client:", client_ids)
-# sauvegarde de l'ID client sélectionné dans l'état de la session
-st.session_state['selected_client_id'] = selected_client_id
-
-# bouton pour aller à la page client
-
-if st.button("Afficher les prédictions du client"):
-    st.session_state["Go_to_client_page"] = True
-    st.switch_page("page_2_client_details")
-else:
-    st.session_state["Go_to_client_page"] = False

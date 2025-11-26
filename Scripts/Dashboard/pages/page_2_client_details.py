@@ -5,19 +5,18 @@ Script pour afficher les prédictions d'un client sélectionné via une requête
 # ////////////////////////////////////////
 # 1- Import des librairies
 # ////////////////////////////////////////
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 from loguru import logger
 import requests
 import traceback
-from streamlit_extras.switch_page_button import switch_page
 import os
 import matplotlib.pyplot as plt
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../App')))
-from Scripts.App.utils import features_mapping
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils import features_mapping
 
 
 
@@ -114,9 +113,6 @@ except ValueError as e:
     st.write(traceback.format_exc())
     st.stop()
 except Exception as e:
-    logger.error(f"Erreur inattendue : {e}")
-    st.write(traceback.format_exc())
-    st.stop()
     st.error("Erreur lors de la récupération de la prédiction du client.")
     st.write(traceback.format_exc())
     st.stop()
@@ -223,8 +219,9 @@ st.subheader("Analyse complémentaire")
 
 # distributions des features du client vs population
 
-mapped_features = [utils.features_mapping(col) for col in data.columns]
-features = [str(feat) for feat in mapped_features]
+data_copy = data.copy()
+data_copy.columns = [features_mapping(col) for col in data.columns]
+client_data.columns = [features_mapping(col) for col in client_data.columns]
 pretty_names = [feat for feat,_ in top_features]
 
 selected_feat_pretty = st.selectbox(
@@ -232,15 +229,10 @@ selected_feat_pretty = st.selectbox(
     pretty_names,
     key="feature_select"
 )
- 
-raw_name = features[pretty_names.index(selected_feat_pretty)] 
-client_value = client_data.iloc[raw_name].values[0]
 
+st.write(client_data.head())
 
-st.write(f"Feature sélectionnée : **{selected_feat_pretty}** ({raw_name})")
-st.write(f"Valeur client : **{client_value}**")
-
-def get_top_feature_distributions(client_data, data, top_features):
+def get_top_feature_distributions(client_data, data, feature_name):
     """
     _Summary_: Affichage des distributions des features du client vs population
     Args:
@@ -250,51 +242,32 @@ def get_top_feature_distributions(client_data, data, top_features):
     _Returns_: None
     """
     st.write("Affichage des distributions des features du client vs population")
-    for feat, val in top_features:
-        fig, ax = plt.subplots(figsize=(6,3))
-        ax.hist(data[feat].dropna(), bins=30, alpha=0.7, label='Population', color='gray')
-        ax.axvline(client_data[feat].values[0], color='red', linestyle='dashed', linewidth=2, label='Client')
-        ax.set_title(f"Distribution de la feature : {feat}")
-        ax.set_xlabel(feat)
-        ax.set_ylabel("Fréquence")
-        ax.legend()
-        st.pyplot(fig)
+    fig, ax = plt.subplots(figsize=(8,4))
+    # Population
+    ax.hist(data[feature_name].dropna(), bins=30, alpha=0.7, label='Population', color='darkblue')
+    # Valeur client
+    serie = data[feature_name].replace({None: np.nan}).dropna()
+    client_value = client_data[feature_name].values[0]
+    st.write(client_value)
+    # Si la valeur client est None → on stoppe
+    if client_value is None or pd.isna(client_value):
+        st.warning(f"La feature '{feature_name}' ne contient pas de valeur pour ce client.")
+        return None
+    # Nettoyage : population sans None / NaN
+    if serie.empty:
+        st.warning(f"La feature '{feature_name}' ne contient aucune donnée exploitable dans la population.")
+        return None
+    ax.axvline(client_value, color='red', linestyle='dashed', linewidth=2, label='Client')
+    ax.set_title(f"Distribution de la feature : {feature_name}")
+    ax.set_xlabel(feature_name)
+    ax.set_ylabel("Fréquence")
+    ax.legend()
+    return fig
 
-fig = get_top_feature_distributions(data, raw_name, client_value)
-st.pyplot(fig)
-
-
-"""
-
-feature_names = [feat for feat, _ in top_features]
-real_feat=response['top_real_names'][0]
-real_names = [f for f in real_feat]
-selected_feat_pretty = st.selectbox(
-    "Sélectionnez une feature pour afficher sa distribution :",
-    feature_names,
-    key="feature_select"
-)
-client_value = client_data[selected_feat_pretty].values[0]
-
-
-st.selectbox("Sélectionnez une feature pour afficher sa distribution :", top_features, key="feature_select")
-for f in top_features:
-    if st.session_state['feature_select'] == f:
-        feat_index = f.index(f)
-        feat_name = features[feat_index]
-        client_value = client_data.iloc[0][f]
-        st.write(f"Affichage de la distribution pour la feature sélectionnée : {f[feat_index]}")
-        fig = get_top_feature_distributions(data, f, client_value)
-        st.pyplot(fig)
+fig = get_top_feature_distributions(client_data, data_copy, selected_feat_pretty)
+if fig is not None:
+    st.pyplot(fig)
 
 
 
 
-
-
-# bouton pour revenir à la page 1
-if st.button("Revenir à l'accueil // au tableau de bord du modèle"):
-    switch_page("page_1_model_overview")
-
-
-"""

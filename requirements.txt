@@ -1,3 +1,4 @@
+
 # outils de feature_engineering / analyse des data
 pandas
 numpy
@@ -18,3 +19,6 @@ streamlit
 # outil de gestion de l'API
 fastapi
 uvicorn
+
+loguru
+python-multipart

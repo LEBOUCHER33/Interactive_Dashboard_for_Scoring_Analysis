@@ -145,8 +145,9 @@ def features_mapping(feature : str, feature_mapping : dict = feature_mapping) ->
     _Returns_:
         - les features mappées
     """
-
-    return feature_mapping.get(feature, feature)
+    if feature is None:
+        return ""
+    return str(feature_mapping.get(feature, feature if feature is not None else ""))
 
 # /////////////////////////////////////////////
 # 1- Fonction de calcul des predictions

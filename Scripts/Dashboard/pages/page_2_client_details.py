@@ -98,7 +98,7 @@ try:
     response = requests.post(url_predict, 
                              headers={"Content-Type": "application/json"}, 
                              json=client_data_json,
-                             timeout=500)
+                             timeout=5000)
     response.raise_for_status()  # lève une exception pour les codes 4xx/5xx
     print(f"Réponse de l'API : {response.json()}, status code : {response.status_code}")
     logger.info("Requête POST envoyée avec succès à l'API pour la prédiction client.")
@@ -119,10 +119,10 @@ except Exception as e:
 
 st.subheader("Détails de la prédiction")
 
-proba=float(response['probabilite_1'][0])
-pred=int(response['prediction'][0])
-top_features = response["top_features"][0] # liste (feat, shap_val)
-
+proba=float(response['prediction_proba'])
+pred=int(response['prediction'])
+top_features_list = data.get("top_features", []) or []
+top_real_names = data.get("explanation", []) or []
 
 # ////////////////////////////////////////////////
 # affichage des résultats dans la side_bar
@@ -130,8 +130,8 @@ top_features = response["top_features"][0] # liste (feat, shap_val)
 
 st.sidebar.subheader("Résultats de la prédiction") 
 st.sidebar.write(f"**ID Client** : {selected_client_id}")
-st.sidebar.write(f"**Prédiction (0=Bon payeur, 1=Mauvais payeur)** : {response['prediction'][0]}")
-st.sidebar.write(f"**Probabilité d'être un mauvais payeur** : {response['probabilite_1'][0]*100:.2f} %")
+st.sidebar.write(f"**Prédiction (0=Bon payeur, 1=Mauvais payeur)** : {response['prediction']}")
+st.sidebar.write(f"**Probabilité d'être un mauvais payeur** : {response['prediction_proba']*100:.2f} %")
 st.sidebar.write(f"**Prédiction avec seuil de risque** : {'Mauvais payeur' if proba >= 0.3 else 'Bon payeur'}")
 
 
@@ -146,14 +146,19 @@ if pred == 1:
     st.error("Le modèle prédit que ce client est un **mauvais payeur**.")
 else:
     st.success("Le modèle prédit que ce client est un **bon payeur**.")
+st.write("### Top 5 features")
 
+pretty_names = [feat for feat,_ in top_features_list]
+for feat, val in top_features_list:
+    st.sidebar.write(f"- **{pretty_names}** : {val:.4f}")
+shap_values = [val for _, val in top_features_list]
 # BARRE DE PROBABILITÉ
-if proba < 0.3:
-    color = "#4CAF50"  
-elif proba < 0.6:
-    color = "#FF9800"
-else:
-    color = "#F44336"
+selected_feat_pretty = st.selectbox(
+    "Sélectionnez une feature pour afficher sa distribution :",
+    pretty_names,
+    key=f"feature_select_top_{selected_client_id}"
+)
+color = "#F44336"
 
 st.markdown(f"""
 <div style="
@@ -179,31 +184,34 @@ st.markdown(f"""
 
 st.subheader("Raisons principales de la décision")
 col1, col2 = st.columns([1, 1])
+# Left column: feature impacts
 with col1:
-    for feat, val in top_features:
-        color = "#F44336" if val > 0 else "#4CAF50"  # rouge = augmente risque, vert = réduit risque
+    for pretty, val in top_features_list:
+        color = "#F44336" if val > 0 else "#4CAF50"
         st.markdown(
             f"""
             <div style="
                 background-color:{color}22;
                 padding:10px;
                 border-radius:8px;
-                margin-bottom:6px;
+                margin-bottom:8px;
             ">
-            <b>{feat}</b>  
-            <br>Impact SHAP : <b style='color:{color};'>{val:+.4f}</b>
+                <b>{pretty}</b><br>
+                Impact SHAP : <b style='color:{color};'>{val:+.4f}</b>
             </div>
             """,
             unsafe_allow_html=True
         )
-    with col2:
-        features = [f for f,v in top_features]
-        values = [v for f,v in top_features]
-        fig, ax = plt.subplots(figsize=(6,3))
-        ax.barh(features, values)
-        ax.set_title("Impact SHAP sur la décision (Top 5)")
-        ax.set_xlabel("Contribution")
-        st.pyplot(fig)
+# Right column: horizontal bar plot
+with col2:
+    features = [f for f, v in top_features_list]
+    values = [v for f, v in top_features_list]
+    fig, ax = plt.subplots(figsize=(6,3))
+    ax.barh(features[::-1], values[::-1])  # reverse for nicer order
+    ax.set_title("Impact SHAP sur la décision (Top 5)")
+    ax.set_xlabel("Contribution")
+    st.pyplot(fig)  # pass the figure
+
 
 # SHAP LOCAL PLOT
 
@@ -219,15 +227,10 @@ st.subheader("Analyse complémentaire")
 
 # distributions des features du client vs population
 
-data_copy = data.copy()
-data_copy.columns = [features_mapping(col) for col in data.columns]
-client_data.columns = [features_mapping(col) for col in client_data.columns]
-pretty_names = [feat for feat,_ in top_features]
-
-selected_feat_pretty = st.selectbox(
+selected_feat_pretty_2 = st.selectbox(
     "Sélectionnez une feature pour afficher sa distribution :",
     pretty_names,
-    key="feature_select"
+    key=f"feature_select_dist_{selected_client_id}"
 )
 
 st.write(client_data.head())
@@ -264,7 +267,7 @@ def get_top_feature_distributions(client_data, data, feature_name):
     ax.legend()
     return fig
 
-fig = get_top_feature_distributions(client_data, data_copy, selected_feat_pretty)
+fig = get_top_feature_distributions(data, client_data, selected_feat_pretty_2)
 if fig is not None:
     st.pyplot(fig)
 

@@ -1,5 +1,5 @@
 """
-Script pour afficher les prédictions d'un client sélectionné via une requête POST
+Script pour afficher les prédictions d'un client sélectionné via une requête GET
 """
 
 # ////////////////////////////////////////
@@ -38,12 +38,12 @@ url_predict = f"{API_URL}/predict"
 
 # data
 file_path = "./Data/Data_cleaned/application_test_final.csv"
-data = pd.read_csv(file_path)
+df = pd.read_csv(file_path)
 try:
     logger.info("Données client chargées avec succès.")
 except Exception as e:
     logger.error(f"Erreur lors du chargement des données client : {e}")
-data['SK_ID_CURR'] = data['SK_ID_CURR'].astype(int)
+df['SK_ID_CURR'] = df['SK_ID_CURR'].astype(int)
 try:
     logger.info("Conversion de SK_ID_CURR en int réussie.")
 except Exception as e:
@@ -61,26 +61,30 @@ st.info("Détails et prédiction pour un client sélectionné")
 # 3-1 Sélection du client
 # /////////////////////////////////////////
 
+if "selected_client_id" not in st.session_state:
+    st.session_state["selected_client_id"] = None
+
 
 st.subheader("Sélection du client pour afficher les prédictions")
-client_ids = data['SK_ID_CURR'].astype(str).tolist()  
+
+client_ids = df['SK_ID_CURR'].astype(str).tolist()  
 selected_client_id = st.selectbox("Sélectionnez un ID client:", client_ids)
 
 # sauvegarde de l'ID client sélectionné dans l'état de la session
-st.session_state['selected_client_id'] = selected_client_id
 
-# extraction des données du client sélectionné
+st.session_state["selected_client_id"] = selected_client_id
+
+# convertir en int pour le filtrage
 client_id_int = int(selected_client_id)
-client_data = data[data["SK_ID_CURR"] == client_id_int]
+client_data = df[df["SK_ID_CURR"] == client_id_int]
+
 if client_data.empty:
     st.error("Aucun client trouvé dans la base.")
     st.stop()
 
-# affichage de l'ID client sélectionné
 st.write(f"Client sélectionné : **{selected_client_id}**")
 st.success("Données du client chargées avec succès.")
 st.write(client_data.head())
-
 
 # /////////////////////////////////////////
 # conception de la side_bar
@@ -88,24 +92,21 @@ st.write(client_data.head())
 
 st.sidebar.header("Indicateurs clés du client")
 
+client_id = st.session_state["selected_client_id"]
 
-client_data = client_data.replace({np.nan: None, np.inf: None, -np.inf: None})
-client_data_json = client_data.to_dict(orient='records')[0]  # convertir en dict pour l'API
-
-# requête POST à l'API pour obtenir la prédiction
+# requête GET à l'API pour obtenir la prédiction
 try:
-    #st.write("JSON envoyé :", client_data_json)
-    response = requests.post(url_predict, 
-                             headers={"Content-Type": "application/json"}, 
-                             json=client_data_json,
+    session = requests.Session()
+    session.trust_env = False
+    response = session.get(f"{url_predict}/{client_id}",
                              timeout=5000)
     response.raise_for_status()  # lève une exception pour les codes 4xx/5xx
     print(f"Réponse de l'API : {response.json()}, status code : {response.status_code}")
-    logger.info("Requête POST envoyée avec succès à l'API pour la prédiction client.")
-    logger.debug(f"Donnees converties en format JSON pour l'API :\nclient_data_json : {client_data_json}")
-    response = response.json()
+    logger.info("Requête GET envoyée avec succès à l'API pour la prédiction client.")
+    data = response.json()
+    st.write(data)
 except requests.exceptions.RequestException as e:
-    logger.error(f"Erreur lors de la requête POST à l'API : {e}")
+    logger.error(f"Erreur lors de la requête GET à l'API : {e}")
     st.write(traceback.format_exc(), str(e))
     st.stop()
 except ValueError as e:
@@ -119,19 +120,19 @@ except Exception as e:
 
 st.subheader("Détails de la prédiction")
 
-proba=float(response['prediction_proba'])
-pred=int(response['prediction'])
+proba = float(data.get("prediction_proba"))
+pred = int(data.get("prediction"))
+
 top_features_list = data.get("top_features", []) or []
-top_real_names = data.get("explanation", []) or []
 
 # ////////////////////////////////////////////////
 # affichage des résultats dans la side_bar
 # ////////////////////////////////////////////////
 
-st.sidebar.subheader("Résultats de la prédiction") 
+st.sidebar.subheader("Résultats de la prédiction")
 st.sidebar.write(f"**ID Client** : {selected_client_id}")
-st.sidebar.write(f"**Prédiction (0=Bon payeur, 1=Mauvais payeur)** : {response['prediction']}")
-st.sidebar.write(f"**Probabilité d'être un mauvais payeur** : {response['prediction_proba']*100:.2f} %")
+st.sidebar.write(f"**Prédiction (0=Bon payeur, 1=Mauvais payeur)** : {data.get('prediction')}")
+st.sidebar.write(f"**Probabilité d'être un mauvais payeur** : {data.get('prediction_proba')*100:.2f} %")
 st.sidebar.write(f"**Prédiction avec seuil de risque** : {'Mauvais payeur' if proba >= 0.3 else 'Bon payeur'}")
 
 
@@ -148,16 +149,40 @@ else:
     st.success("Le modèle prédit que ce client est un **bon payeur**.")
 st.write("### Top 5 features")
 
-pretty_names = [feat for feat,_ in top_features_list]
-for feat, val in top_features_list:
-    st.sidebar.write(f"- **{pretty_names}** : {val:.4f}")
-shap_values = [val for _, val in top_features_list]
+
+#data_copy = data.copy()
+#client_data_copy = client_data.copy()
+
+# Renommer les colonnes avec ta fonction de mapping
+#data_copy.columns = [features_mapping(col) for col in data_copy.columns]
+#client_data_copy.columns = [features_mapping(col) for col in client_data_copy.columns]
+
+# Générer la liste des noms “jolis” des features importantes
+#pretty_names = [features_mapping(feat) for feat, _ in top_features]
+
+pretty_names = []
+shap_values = []
+
+if top_features_list:
+    # Cas tuple (feature, value)
+    if isinstance(top_features_list[0], tuple):
+        pretty_names = [features_mapping(feat) for feat, _ in top_features_list]
+        shap_values = [val for _, val in top_features_list]
+
+    # Cas dict {"feature": ..., "value": ...}
+    elif isinstance(top_features_list[0], dict):
+        pretty_names = [features_mapping(d["feature"]) for d in top_features_list]
+        shap_values = [d.get("value", 0.0) for d in top_features_list]
+
 # BARRE DE PROBABILITÉ
-selected_feat_pretty = st.selectbox(
-    "Sélectionnez une feature pour afficher sa distribution :",
-    pretty_names,
-    key=f"feature_select_top_{selected_client_id}"
-)
+if pretty_names:
+    selected_feat_pretty = st.selectbox(
+        "Sélectionnez une feature pour afficher sa distribution :",
+        pretty_names,
+        key=f"feature_select_top_{selected_client_id}"
+    )
+else:
+    selected_feat_pretty = ""
 color = "#F44336"
 
 st.markdown(f"""
@@ -212,7 +237,7 @@ with col2:
     ax.set_xlabel("Contribution")
     st.pyplot(fig)  # pass the figure
 
-
+"""
 # SHAP LOCAL PLOT
 
 local_shap_path = f"./Metrics/shap_local_['{selected_client_id}'].png"
@@ -221,17 +246,21 @@ if os.path.exists(local_shap_path):
          caption="Importance des features pour la prédiction du client selon SHAP")
 else:
     st.info("Le graphique SHAP local pour ce client n'est pas disponible.")
+"""
 
 # implémentation d'un bouton pour accéder à des plots :
 st.subheader("Analyse complémentaire")
 
 # distributions des features du client vs population
 
-selected_feat_pretty_2 = st.selectbox(
-    "Sélectionnez une feature pour afficher sa distribution :",
-    pretty_names,
-    key=f"feature_select_dist_{selected_client_id}"
-)
+if pretty_names:
+    selected_feat_pretty_2 = st.selectbox(
+        "Sélectionnez une feature pour afficher sa distribution :",
+        pretty_names,
+        key=f"feature_select_dist_{selected_client_id}"
+    )
+else:
+    selected_feat_pretty_2 = ""
 
 st.write(client_data.head())
 
@@ -267,9 +296,10 @@ def get_top_feature_distributions(client_data, data, feature_name):
     ax.legend()
     return fig
 
-fig = get_top_feature_distributions(data, client_data, selected_feat_pretty_2)
-if fig is not None:
-    st.pyplot(fig)
+if selected_feat_pretty_2:
+    fig = get_top_feature_distributions(data, client_data, selected_feat_pretty_2)
+    if fig is not None:
+        st.pyplot(fig)
 
 
 

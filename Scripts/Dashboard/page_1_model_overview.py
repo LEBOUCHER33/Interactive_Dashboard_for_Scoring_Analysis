@@ -47,7 +47,7 @@ import pandas as pd
 import numpy as np
 from loguru import logger
 import requests
-from streamlit_extras.switch_page_button import switch_page 
+import os
 
 
 # /////////////////////////////////////////
@@ -63,7 +63,7 @@ else:
 
 # Endpoints
 url_predict = f"{API_URL}/predict"
-url_metrics = f"{API_URL}/metrics"
+url_metrics = f"{API_URL}/compute_metrics"
 
 # data
 file_path = "./Data/Data_cleaned/application_test_final.csv"
@@ -96,7 +96,10 @@ st.info("Outil métier d'aide à la décision pour l'octroi d'un crédit à la c
 
 st.header("Indicateurs clés du Modèle")
 
-@st.cache_data
+METRICS_DIR = "./Metrics"
+os.makedirs(METRICS_DIR, exist_ok=True)
+
+#@st.cache_data(show_spinner=False, ttl=5)
 def get_global_metrics(refresh: bool = False):
     """
     _Summary_: Récupération des métriques globales du modèle via l'API.
@@ -105,22 +108,32 @@ def get_global_metrics(refresh: bool = False):
     _Returns_:
         dict: métriques globales ou None si erreur
     """
+    session = requests.Session()
+    session.trust_env = False
     try:
-        params = {"refresh": True} if refresh else {}
-        response = requests.get(url_metrics, params=params, timeout=300)
-        response.raise_for_status()  # lève une exception pour les codes 4xx/5xx
+        params = {"refresh": str(refresh).lower()}
+        response = session.post(url_metrics, params=params, timeout=600)
+
+        if response.status_code != 200:
+            st.error(f"Erreur API ({response.status_code}): {response.text}")
+            return None
+        response.raise_for_status() 
         logger.info("Requête GET envoyée avec succès à l'API.")
         return response.json()
     except requests.exceptions.RequestException as e:
-        logger.error(f"Erreur lors de la requête GET à l'API : {e}")
+        st.error(f"Erreur de connexion à l'API : {e}")
         return None
 
-# Streamlit
-refresh_button = st.button("Rafraichir les métriques globales")
-if refresh_button:
-    metrics = get_global_metrics(refresh=refresh_button)
-else:
-    metrics = get_global_metrics()
+metrics = get_global_metrics(refresh=True)
+
+#st.write("**Debug - Type reçu :**", type(metrics))
+
+if metrics:
+    #st.write("**Debug - Contenu reçu :**", metrics)# Cas 1 : Structure correcte (Celle qu'on veut)
+    if "metrics" in metrics:
+        kp_metrics = metrics['metrics']
+        clients_data = metrics.get('client', {}) # .get pour éviter erreur si absent
+        st.success("Données structurées chargées correctement.")
 
 
 if metrics is not None:  
@@ -128,25 +141,45 @@ if metrics is not None:
     col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("Indicateurs de performance")
-        st.metric("Risque moyen par client de non-solvabilité :", f"{metrics['risk_moy_fn']*100:.2f}%")
-        st.metric("Score moyen global :", f"{metrics['score_moy']}")
+        st.metric("Risque moyen par client de non-solvabilité :", f"{kp_metrics['risk_moy_fn']:.3f}%")
+        st.metric("Score moyen global :", f"{kp_metrics['score_moy']*100:.2f}%")
         st.metric("Dérive des données :", "Stable")
         st.metric("Seuil décisionnel :", 0.3)    
     with col2:
         st.subheader("Explainabilité Globale")
-        st.image("./Metrics/global_shap.png",
-                 caption="Importance globale des features selon SHAP")
+        image_filename = "global_shap.png"
+        image_path = os.path.join(METRICS_DIR, image_filename)
+    
+    if os.path.exists(image_path):
+        st.image(image_path, caption="Importance globale des features (SHAP)")
+    else:
+        st.info("L'image s'affichera ici après le calcul des métriques.")
 
 st.header("Caractéristiques du fichier client")
-# affichage des caractéristiques du fichier client
-st.metric("Nombre de demandes : ", f"{metrics['nb_clients']}")
-st.metric("Taux de crédits accordés : ", f"{metrics['nb_accord']*100/metrics['nb_clients']:.2f}%")        
-st.metric("Taux de crédits refusés : ", f"{metrics['nb_refus']*100/metrics['nb_clients']:.2f}%")
-st.metric("Taux d'accord moyen :", f"{metrics['taux_accord']*100:.2f}%")
+col_a, col_b, col_c, col_d = st.columns(4)
+col_a.metric("Nombre de clients", kp_metrics['nb_clients'])
+if kp_metrics['nb_clients'] > 0:
+        taux_accord_calc = (kp_metrics['nb_accord'] / kp_metrics['nb_clients']) * 100
+        taux_refus_calc = (kp_metrics['nb_refus'] / kp_metrics['nb_clients']) * 100
+else:
+    taux_accord_calc = 0
+    taux_refus_calc = 0
+# affichage des caractéristiques du fichier client       
+col_b.metric("Crédits Accordés", f"{taux_accord_calc:.1f}%")
+col_c.metric("Crédits Refusés", f"{taux_refus_calc:.1f}%")
+col_d.metric("Age moyen", f"{kp_metrics['age_moye_client']} ans")
+
 
 # ////////////////////////////////////
 # extrait du fichier client
 # ////////////////////////////////////
 st.subheader("Extrait du fichier client")
-st.dataframe(data.head(3))
+if clients_data:
+        # Transformation du dict {id: {data}} en liste de dicts [{data}, {data}]
+        list_clients = list(clients_data.values())
+        df_display = pd.DataFrame(list_clients)
+        cols_to_show = ["client_id", "prediction", "prediction_proba"]
+        st.dataframe(df_display[cols_to_show].head(5))
+else:
+    st.warning("Aucune donnée client disponible.")
 

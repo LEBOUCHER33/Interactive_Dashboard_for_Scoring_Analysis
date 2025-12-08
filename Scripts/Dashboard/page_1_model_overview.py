@@ -99,7 +99,7 @@ st.header("Indicateurs clés du Modèle")
 METRICS_DIR = "./Metrics"
 os.makedirs(METRICS_DIR, exist_ok=True)
 
-#@st.cache_data(show_spinner=False, ttl=5)
+@st.cache_data(show_spinner=False, ttl=5)
 def get_global_metrics(refresh: bool = False):
     """
     _Summary_: Récupération des métriques globales du modèle via l'API.

@@ -104,11 +104,11 @@ async def lifespan(app: FastAPI):
     try:
         print("[STARTUP] Tentative de pré-calcul des métriques (Sample=2000)...")
         raw_metrics = compute_metrics(
-            df=df, # df global
+            df=df, 
             model_pipeline=model_pipeline,
             explainer=GLOBAL_EXPLAINER,
             features_mapping=features_mapping,
-            sample_size=2000 
+            sample_size=len(df)
         )
         CACHED_METRICS = jsonable_encoder(raw_metrics)
         print("[STARTUP] Métriques pré-calculées avec succès !")
@@ -166,7 +166,8 @@ async def predict(client_id: int):
         data (list[dict] | dict): données clients au format JSON (un ou plusieurs individus)
     _Return_: JSONResponse
     """
-    global CACHED_METRICS, model_pipeline, df
+    global CACHED_METRICS
+
     print("[DEBUG] CACHED_METRICS keys:", list(CACHED_METRICS.keys()) if CACHED_METRICS else None)
     if CACHED_METRICS is None:
         return JSONResponse(status_code=503, content={"error": "Les prédictions ne sont pas encore prêtes."})

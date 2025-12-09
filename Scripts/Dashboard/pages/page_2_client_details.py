@@ -22,6 +22,7 @@ from utils import features_mapping
 
 
 
+
 # /////////////////////////////////////////
 # 2- Paramètres
 # /////////////////////////////////////////
@@ -96,9 +97,9 @@ client_id = st.session_state["selected_client_id"]
 
 # requête GET à l'API pour obtenir la prédiction
 try:
-    session = requests.Session()
-    session.trust_env = False
-    response = session.get(f"{url_predict}/{client_id}",
+    #session = requests.Session()
+    #session.trust_env = False
+    response = requests.get(f"{url_predict}/{client_id}",
                              timeout=5000)
     response.raise_for_status()  # lève une exception pour les codes 4xx/5xx
     print(f"Réponse de l'API : {response.json()}, status code : {response.status_code}")
@@ -188,19 +189,39 @@ st.markdown(
 
 # EXPLAINABILITE
 
-#st.write("### Top 5 features")
 
-feat_pretty_names = [features_mapping(f) for f,_ in top_features_list]
+# /////////////////////////////////////////
+# Affichage top features SHAP
+# /////////////////////////////////////////
+
+def clean_feature_name(name: str) -> str:
+    """Retire les préfixes du pipeline pour retrouver le nom brut."""
+    if name.startswith("remainder__"):
+        return name.replace("remainder__", "")
+    if "__" in name:
+        return name.split("__")[-1]
+    return name
 
 
-# TOP FEATURES
+# TOP FEATURES — Nettoyage + mapping propre
+top_features_cleaned = [
+    (
+        raw,                                           # nom pipeline
+        features_mapping(clean_feature_name(raw)),     # nom joli propre
+        float(val)                                     # valeur shap
+    )
+    for raw, _, val in top_features_list
+]
+
 
 st.subheader("Raisons principales de la décision")
 col1, col2 = st.columns([1, 2])
-# Left column: feature impacts
+
 with col1:
-    for pretty, val in top_features_list:
+    for raw_feat, pretty_feat, val in top_features_cleaned:
+
         color = "#F44336" if val > 0 else "#4CAF50"
+
         st.markdown(
             f"""
             <div style="
@@ -208,68 +229,75 @@ with col1:
                 padding:10px;
                 border-radius:8px;
                 margin-bottom:8px;
+                border-left: 5px solid {color};
             ">
-                <b>{pretty}</b><br>
-                Impact SHAP : <b style='color:{color};'>{val:+.4f}</b>
+                <small style="opacity:0.7">{raw_feat}</small><br>
+                <b>{pretty_feat}</b><br>
+                Impact : <b style='color:{color};'>{val:+.4f}</b>
             </div>
             """,
             unsafe_allow_html=True
         )
-# Right column: horizontal bar plot
+
+# Colonne droite : Bar plot SHAP
 with col2:
-    features = [features_mapping(f) for f,_ in top_features_list]
-    values = [v for _, v in top_features_list]
-    fig, ax = plt.subplots(figsize=(6,3))
-    ax.barh(features[::-1], values[::-1])  # reverse for nicer order
-    ax.set_title("Impact SHAP sur la décision (Top 5)")
-    ax.set_xlabel("Contribution")
-    st.pyplot(fig)  # pass the figure
+    features_labels = [pretty for _, pretty, val in top_features_cleaned]
+    values = [val for _, _, val in top_features_cleaned]
 
+    fig, ax = plt.subplots(figsize=(6, 4))
+    y_pos = range(len(features_labels))
 
-
-# implémentation d'un bouton pour accéder à des plots :
-st.subheader("Analyse complémentaire")
-
-# distributions des features du client vs population
-
-if feat_pretty_names:
-    selected_feat_pretty = st.selectbox(
-        "Sélectionnez une feature pour afficher sa distribution :",
-        feat_pretty_names,
-        key=f"feature_select_dist_{selected_client_id}"
+    ax.barh(
+        y_pos,
+        values[::-1],
+        color=["#F44336" if v > 0 else "#4CAF50" for v in values[::-1]],
     )
-else:
-    selected_feat_pretty = ""
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(features_labels[::-1])
+    ax.set_title("Impact SHAP sur la décision (Top 5)")
+    ax.set_xlabel("Contribution au score")
+
+    st.pyplot(fig)
 
 
+# ---------------------------------------------------------
+# Analyse complémentaire (Distributions)
+# ---------------------------------------------------------
+st.subheader("Analyse de la position du client")
 
-#st.write(client_data.head())
+def plot_feature_distribution(client_data, df_population, feature_name, feature_pretty_name):
+    fig, ax = plt.subplots(figsize=(8, 4))
 
-def get_top_feature_distributions(client_data, df, feature_name):
-    """
-    _Summary_: Affichage des distributions des features du client vs population
-    Args:
-        client_data (_type_): données du client sélectionné
-        data (_type_): données de la population
-        top_features (_type_): liste des features les plus importantes pour la prédiction du client
-    _Returns_: None
-    """
-    st.write("Affichage des distributions des features du client vs population")
-    fig, ax = plt.subplots(figsize=(8,4))
-    ax.hist(df[feature_name].dropna(), bins=30, alpha=0.7, label='Population', color='darkblue')
-    serie = df[feature_name].replace({None: np.nan}).dropna()
-    client_val= 
-    ax.hist(pop, bins=30, alpha=0.7, label="Population")
-    ax.axvline(client_val, color="red", linestyle="--", linewidth=2, label="Client")
+    data_to_plot = df_population[feature_name].dropna()
+    ax.hist(data_to_plot, bins=30, alpha=0.6, label='Population', color='#3f51b5', density=True)
 
-    ax.set_title(f"Distribution : {feature_raw}")
+    try:
+        client_val = client_data[feature_name].values[0]
+        ax.axvline(client_val, color="red", linestyle="--", linewidth=2,
+                   label=f"Client ({client_val:.2f})")
+    except KeyError:
+        st.warning(f"Impossible de trouver la valeur brute pour {feature_name}")
+
+    ax.set_title(f"Distribution : {feature_pretty_name}")
     ax.legend()
     return fig
 
-if feat_pretty_names:
-    fig = get_top_feature_distributions(df, client_data, selected_feat_pretty)
-    if fig:
-        st.pyplot(fig)
+valid_for_plot = [
+    (raw, pretty)
+    for raw, pretty, _ in top_features_cleaned
+    if clean_feature_name(raw) in df.columns  
+]
 
+if valid_for_plot:
+    options_map = {pretty: raw for raw, pretty in valid_for_plot}
 
+    selected_pretty_name = st.selectbox(
+        "Sélectionnez une variable à analyser :",
+        list(options_map.keys())
+    )
 
+    raw_col_name = clean_feature_name(options_map[selected_pretty_name])
+
+    fig = plot_feature_distribution(client_data, df, raw_col_name, selected_pretty_name)
+    st.pyplot(fig)

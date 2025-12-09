@@ -13,17 +13,15 @@ et des noms descriptifs explicites
 
 import pandas as pd
 import numpy as np
-import os
-import matplotlib
-matplotlib.use("Agg")
 import shap
 import matplotlib.pyplot as plt
+import os
 
 # ///////////////////////////////
 # dictionnaire de mapping
 # ///////////////////////////////
 
-feature_mapping = {
+feat_mapping = {
 # --- Sources externes / score socio-économique ---
     "EXT_SOURCE_1": "Source externe de risque 1 (score socio-économique)",
     "EXT_SOURCE_2": "Source externe de risque 2 (score socio-économique)",
@@ -138,22 +136,31 @@ feature_mapping = {
 # Fonction de mapping des features
 # ///////////////////////////////////////
 
-def features_mapping(feature : str, feature_mapping : dict = feature_mapping) -> str:
+# Fonction de mapping
+def features_mapping(feature: str, mapping: dict = None) -> str:
     """
-    _Summary_: Fonction qui mappe les noms des variables en noms explicites
-    _Args_:
-        - feature : str
-        - feature_mapping : dict
-    _Returns_:
-        - les features mappées
+    Mappe les noms des variables en noms explicites.
     """
     if feature is None:
         return ""
-    return str(feature_mapping.get(feature, feature if feature is not None else ""))
+    if mapping is None:
+        mapping = {}
+    return str(mapping.get(feature, feature))
+
+def clean_feature_name(name: str) -> str:
+    """Nettoie les noms hérités du pipeline (remainder__, onehot__, etc.)."""
+    if name.startswith("remainder__"):
+        return name.replace("remainder__", "")
+    if "__" in name:
+        return name.split("__")[-1]
+    return name
+
+
 
 # /////////////////////////////////////////////
 # 1- Fonction de calcul des predictions
 # /////////////////////////////////////////////
+
 
 output_dir =  "./Scripts/App"
 
@@ -179,24 +186,39 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
     else:
         df_sample = df.copy()
     df_sample = df_sample.replace({np.nan: None, np.inf: None, -np.inf: None})
+
     # calcul des predictions
     prediction = model_pipeline.predict(df_sample) # score (0, 1)
     prediction_proba = model_pipeline.predict_proba(df_sample)[:,1] # proba d'être 1
     prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # proba d'être 1 avec un seuil plus stringent
+
     # explainabilite
     data_transformed = model_pipeline.named_steps['preprocessor'].transform(df_sample)
     shap_values = explainer.shap_values(data_transformed)
-    client_dict = {}
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]
+    
     feature_names = model_pipeline.named_steps["preprocessor"].get_feature_names_out()
     mapped_feature_names = [features_mapping(col) for col in feature_names]
     df_sample_reset = df_sample.reset_index(drop=True)
+    client_dict = {}
     for i in range(len(df_sample_reset)):
-        current_client_id = str(df_sample_reset["SK_ID_CURR"].iloc[i])
+        raw_id = df_sample_reset["SK_ID_CURR"].iloc[i]
+        try:
+            current_client_id = str(int(float(raw_id)))
+        except Exception:
+            current_client_id = str(raw_id).split('.')[0]
         vals = shap_values[i] if not isinstance(shap_values, list) else shap_values[1][i]
         features_shap = dict(zip(feature_names, vals))
         top_5_features = sorted(features_shap.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
-        # mapping
-        top_5_features_serializable = [(features_mapping(k), float(v)) for k, v in top_5_features]
+        top_5_features_serializable = [
+    (
+        k,                                     # nom pipeline
+        features_mapping(clean_feature_name(k)),  # nom joli nettoyé
+        float(v)
+    )
+    for k, v in top_5_features
+]
         client_dict[current_client_id] = {
             "client_id": int(current_client_id),
             "prediction": int(prediction[i]),
@@ -204,7 +226,6 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
             "prediction_proba_seuil": int(prediction_proba_seuil[i]),
             "top_features": top_5_features_serializable
         }
-
     os.makedirs("./Metrics", exist_ok=True)
     shap_plot_path = "./Metrics/global_shap.png"
     plt.figure(figsize=(10, 6))
@@ -224,9 +245,9 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
         "drift": 0.17,
         "seuil_decisionnel": 0.3,
         "nb_clients": int(len(df_sample)),
-        "age_moye_client": round(float(df_sample["DAYS_BIRTH"].mean() / 365), 1),
-        "nb_accord": int(len(prediction[prediction == 0])),
-        "nb_refus": int(len(prediction[prediction == 1])),
+        "age_moye_client": round(float(abs(df_sample["DAYS_BIRTH"].mean() / 365)), 1),
+        "nb_accord": int((prediction == 0).sum()),
+        "nb_refus": int((prediction == 1).sum()),
         "shap_plot_path": shap_plot_path
     }
     return {

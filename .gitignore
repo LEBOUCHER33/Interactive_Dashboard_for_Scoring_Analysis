@@ -2,8 +2,7 @@ my_env_p8
 Scripts/logs/
 logs/
 notebook_1.ipynb
-Data_source
-Data_cleaned
+Data/Data_source
 application_test_final.csv
 __pycache__
-Metrics/
+Data/Data_cleaned/application_train_final.csv

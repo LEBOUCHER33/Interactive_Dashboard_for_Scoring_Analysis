@@ -21,7 +21,7 @@ import os
 # dictionnaire de mapping
 # ///////////////////////////////
 
-feature_mapping = {
+feat_mapping = {
 # --- Sources externes / score socio-économique ---
     "EXT_SOURCE_1": "Source externe de risque 1 (score socio-économique)",
     "EXT_SOURCE_2": "Source externe de risque 2 (score socio-économique)",
@@ -136,7 +136,7 @@ feature_mapping = {
 # Fonction de mapping des features
 # ///////////////////////////////////////
 
-def features_mapping(feature : str, feature_mapping : dict = feature_mapping) -> str:
+def features_mapping(feature : str, feature_mapping : dict = feat_mapping) -> str:
     """
     _Summary_: Fonction qui mappe les noms des variables en noms explicites
     _Args_:
@@ -145,12 +145,24 @@ def features_mapping(feature : str, feature_mapping : dict = feature_mapping) ->
     _Returns_:
         - les features mappées
     """
+    if feature is None:
+        return ""
+    return str(feature_mapping.get(feature, feature if feature is not None else ""))
 
-    return feature_mapping.get(feature, feature)
+
+
+def clean_feature_name(name: str) -> str:
+    """Retire les préfixes du pipeline pour retrouver le nom brut."""
+    if name.startswith("remainder__"):
+        return name.replace("remainder__", "")
+    if "__" in name:
+        return name.split("__")[-1]
+    return name
 
 # /////////////////////////////////////////////
 # 1- Fonction de calcul des predictions
 # /////////////////////////////////////////////
+
 
 output_dir =  "./Scripts/App"
 
@@ -172,64 +184,77 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
     """
     # data
     if sample_size and sample_size <= len(df):
-        df = df.sample(n=sample_size, random_state=42)
-    df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
+        df_sample = df.sample(n=sample_size, random_state=42)
+    else:
+        df_sample = df.copy()
+    df_sample = df_sample.replace({np.nan: None, np.inf: None, -np.inf: None})
     # calcul des predictions
-    prediction = model_pipeline.predict(df) # score (0, 1)
-    prediction_proba = model_pipeline.predict_proba(df)[:,1] # proba d'être 1
+    prediction = model_pipeline.predict(df_sample) # score (0, 1)
+    prediction_proba = model_pipeline.predict_proba(df_sample)[:,1] # proba d'être 1
     prediction_proba_seuil = (prediction_proba>=0.3).astype(int) # proba d'être 1 avec un seuil plus stringent
     # explainabilite
-    data_transformed = model_pipeline.named_steps['preprocessor'].transform(df)
+    data_transformed = model_pipeline.named_steps['preprocessor'].transform(df_sample)
     shap_values = explainer.shap_values(data_transformed)
-    explanations = []
-    for i in range(len(df)):
-        features_shap = dict(zip(df.columns, shap_values[i].tolist()))  # on associe chaque feature à sa valeur SHAP
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]
+    
+    feature_names = model_pipeline.named_steps["preprocessor"].get_feature_names_out()
+    if feature_names.startswith("remainder__"):
+        feature_names = feature_names[len("remainder__"):]
+
+    mapped_feature_names = [features_mapping(col) for col in feature_names]
+    df_sample_reset = df_sample.reset_index(drop=True)
+    client_dict = {}
+    for i in range(len(df_sample_reset)):
+        raw_id = df_sample_reset["SK_ID_CURR"].iloc[i]
+        try:
+            current_client_id = str(int(float(raw_id)))
+        except Exception:
+            current_client_id = str(raw_id).split('.')[0]
+        vals = shap_values[i] if not isinstance(shap_values, list) else shap_values[1][i]
+        features_shap = dict(zip(feature_names, vals))
         top_5_features = sorted(features_shap.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
-        # mapping
-        features_mapped = {features_mapping(f): v for f, v in top_5_features}
-        explanations.append(features_mapped)
-    # graph shap_plot
-    shap_plot_path = "./Metrics/global_shap.png"
+        top_features_serializable = [
+    (   raw,                                      # nom brut envoyé au front
+        features_mapping(clean_feature_name(raw)),# nom joli corrigé
+        float(val)                                 # valeur
+    )
+    for raw, val in top_5_features                 # <-- ton input original
+]
+        client_dict[current_client_id] = {
+            "client_id": int(current_client_id),
+            "prediction": int(prediction[i]),
+            "prediction_proba": float(prediction_proba[i]),
+            "prediction_proba_seuil": int(prediction_proba_seuil[i]),
+            "top_features": top_features_serializable
+        }
     os.makedirs("./Metrics", exist_ok=True)
-    column_names = df.columns.tolist()
-    renamed_columns = [features_mapping(f) for f in column_names]
-    plt.figure(figsize=(10,6))
+    shap_plot_path = "./Metrics/global_shap.png"
+    plt.figure(figsize=(10, 6))
     shap.summary_plot(shap_values, 
                       features=data_transformed,
-                      feature_names=renamed_columns,
+                      feature_names=mapped_feature_names,
                       show=False)
     plt.savefig(shap_plot_path, bbox_inches='tight', dpi=150)
-    plt.close
-    # calcul des stats
-    score_moy = float(prediction.mean())
-    taux_refus = float(prediction_proba_seuil.mean())
-    taux_accord = float(1-taux_refus)
-    risk_moy_fn = float(1753/61503) # FN/total predictions
-    seuil_decisionnel = float(0.3)
-    drift = float(0.17)
-    # stats BD
-    nb_clients = int(len(df))
-    age_moye_client = float(df["DAYS_BIRTH"].mean() / 365)
-    nb_refus = int(len(prediction[prediction==1]))
-    nb_accord = int(len(prediction[prediction==0]))
+    plt.close()
+
     # resultats
-    metrics = {
-        "score_moy": round(score_moy,3),
-        "taux_refus": round(taux_refus,2),
-        "taux_accord": round(taux_accord,2),
-        "risk_moy_fn": round(risk_moy_fn,2),
-        "drift": drift,
-        "seuil_decisionnel": seuil_decisionnel,
-        "nb_clients": nb_clients,
-        "age_moye_client": round(age_moye_client,1),
-        "nb_accord": nb_accord,
-        "nb_refus": nb_refus,
-        "top_features": explanations,
+    metrics_stats = {
+        "score_moy": float(prediction.mean()), # Conversion float numpy -> float python
+        "taux_refus": float(prediction_proba_seuil.mean()),
+        "taux_accord": float(1 - prediction_proba_seuil.mean()),
+        "risk_moy_fn": round(1753/61503, 3),
+        "drift": 0.17,
+        "seuil_decisionnel": 0.3,
+        "nb_clients": int(len(df_sample)),
+        "age_moye_client": round(float(abs(df_sample["DAYS_BIRTH"].mean() / 365)), 1),
+        "nb_accord": int((prediction == 0).sum()),
+        "nb_refus": int((prediction == 1).sum()),
         "shap_plot_path": shap_plot_path
     }
-    return metrics
+    return {
+        "metrics":metrics_stats, 
+        "client": client_dict
+    }
 
-# /////////////////////////////////////////////////////
-# fonction de generation d'un graph shap explainer
-# /////////////////////////////////////////////////////
 

@@ -28,7 +28,7 @@ from utils import features_mapping
 # /////////////////////////////////////////
 
 # url
-USE_RENDER = False  # False = local, True = Render
+USE_RENDER = True  # False = local, True = Render
 if USE_RENDER:
     API_URL = "https://client-scoring-model.onrender.com"
 else:

@@ -112,6 +112,15 @@ def load_metrics_once():
     return st.session_state.global_metrics
 
 
+if st.button("Recalculer les métriques"):
+    params = {"refresh": "true"}
+    session = requests.Session()
+    session.trust_env = False
+    response = session.post(url_metrics, params=params, timeout=600)
+    st.session_state.metrics = response.json()
+    st.success("Métriques recalculées !")
+
+
 metrics = load_metrics_once()
 
 

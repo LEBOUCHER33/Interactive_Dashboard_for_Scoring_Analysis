@@ -52,13 +52,7 @@ import matplotlib.pyplot as plt
 
 from fastapi.middleware.cors import CORSMiddleware
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # ou l’URL de ton frontend Render
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
 
 # //////////////////////////////////////////////////
 # loading des data
@@ -130,6 +124,16 @@ async def lifespan(app: FastAPI):
     print("[SHUTDOWN] Arrêt de l'API.")
 
 app = FastAPI(lifespan=lifespan)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ou l’URL de ton frontend Render
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 @app.post("/compute_metrics")

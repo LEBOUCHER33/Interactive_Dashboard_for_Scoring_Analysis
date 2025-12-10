@@ -61,6 +61,7 @@ from fastapi.middleware.cors import CORSMiddleware
 df =  pd.read_csv("./Data/Data_cleaned/application_test_final.csv")
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
+df = df.sample(2000)
 
 
 # //////////////////////////////////////////////////
@@ -93,16 +94,16 @@ GLOBAL_EXPLAINER = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global CACHED_METRICS#, GLOBAL_EXPLAINER
+    global CACHED_METRICS, GLOBAL_EXPLAINER
     print("[STARTUP] Lancement de l'API...")
     
     # 1. Chargement/Calcul de l'Explainer
-    #try:
-        #print("[STARTUP] Calcul de l'explainer SHAP...")
-        #GLOBAL_EXPLAINER = shap.TreeExplainer(model)
-        #print("[STARTUP] Explainer prêt.")
-    #except Exception as e:
-    #    print(f"[STARTUP] Erreur Explainer : {e}")
+    try:
+        print("[STARTUP] Calcul de l'explainer SHAP...")
+        GLOBAL_EXPLAINER = shap.TreeExplainer(model)
+        print("[STARTUP] Explainer prêt.")
+    except Exception as e:
+        print(f"[STARTUP] Erreur Explainer : {e}")
 
     # 2. Tentative de calcul des métriques (Petit échantillon)
     try:
@@ -110,9 +111,9 @@ async def lifespan(app: FastAPI):
         raw_metrics = compute_metrics(
             df=df, 
             model_pipeline=model_pipeline,
-            explainer=shap.TreeExplainer(model),
+            explainer=GLOBAL_EXPLAINER,
             features_mapping=features_mapping,
-            sample_size=200
+            sample_size=len(df)
         )
         CACHED_METRICS = jsonable_encoder(raw_metrics)
         print("[STARTUP] Métriques pré-calculées avec succès !")
@@ -137,7 +138,7 @@ app.add_middleware(
 
 @app.post("/compute_metrics")
 async def compute_data(refresh:bool = False):
-    global CACHED_METRICS #, GLOBAL_EXPLAINER
+    global CACHED_METRICS , GLOBAL_EXPLAINER
     
     if refresh or CACHED_METRICS is None:
         logger.info(f"REQ REÇUE - Refresh demandé : {refresh}")
@@ -146,7 +147,7 @@ async def compute_data(refresh:bool = False):
             raw_metrics = compute_metrics(
                     df=df_copy,  
                     model_pipeline=model_pipeline,
-                    explainer=shap.TreeExplainer(model),
+                    explainer=GLOBAL_EXPLAINER,
                     features_mapping = features_mapping,
                     sample_size=len(df_copy)
                 )

@@ -102,7 +102,7 @@ async def lifespan(app: FastAPI):
 
     # 2. Tentative de calcul des métriques (Petit échantillon)
     try:
-        print("[STARTUP] Tentative de pré-calcul des métriques (Sample=2000)...")
+        print("[STARTUP] Tentative de pré-calcul des métriques...")
         raw_metrics = compute_metrics(
             df=df, 
             model_pipeline=model_pipeline,

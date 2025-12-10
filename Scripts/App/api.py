@@ -93,16 +93,16 @@ GLOBAL_EXPLAINER = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global CACHED_METRICS, GLOBAL_EXPLAINER
+    global CACHED_METRICS#, GLOBAL_EXPLAINER
     print("[STARTUP] Lancement de l'API...")
     
     # 1. Chargement/Calcul de l'Explainer
-    try:
-        print("[STARTUP] Calcul de l'explainer SHAP...")
-        GLOBAL_EXPLAINER = shap.TreeExplainer(model)
-        print("[STARTUP] Explainer prêt.")
-    except Exception as e:
-        print(f"[STARTUP] Erreur Explainer : {e}")
+    #try:
+        #print("[STARTUP] Calcul de l'explainer SHAP...")
+        #GLOBAL_EXPLAINER = shap.TreeExplainer(model)
+        #print("[STARTUP] Explainer prêt.")
+    #except Exception as e:
+    #    print(f"[STARTUP] Erreur Explainer : {e}")
 
     # 2. Tentative de calcul des métriques (Petit échantillon)
     try:
@@ -110,7 +110,7 @@ async def lifespan(app: FastAPI):
         raw_metrics = compute_metrics(
             df=df, 
             model_pipeline=model_pipeline,
-            explainer=GLOBAL_EXPLAINER,
+            explainer=shap.TreeExplainer(model),
             features_mapping=features_mapping,
             sample_size=200
         )
@@ -137,7 +137,7 @@ app.add_middleware(
 
 @app.post("/compute_metrics")
 async def compute_data(refresh:bool = False):
-    global CACHED_METRICS, GLOBAL_EXPLAINER
+    global CACHED_METRICS #, GLOBAL_EXPLAINER
     
     if refresh or CACHED_METRICS is None:
         logger.info(f"REQ REÇUE - Refresh demandé : {refresh}")
@@ -146,7 +146,7 @@ async def compute_data(refresh:bool = False):
             raw_metrics = compute_metrics(
                     df=df_copy,  
                     model_pipeline=model_pipeline,
-                    explainer=GLOBAL_EXPLAINER,
+                    explainer=shap.TreeExplainer(model),
                     features_mapping = features_mapping,
                     sample_size=len(df_copy)
                 )

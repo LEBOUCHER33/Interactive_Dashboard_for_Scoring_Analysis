@@ -100,7 +100,9 @@ def load_metrics_once():
     if "global_metrics" not in st.session_state:
         try:
             params = {"refresh": "false"}
-            response = requests.post(url_metrics, params=params, timeout=600)
+            session = requests.Session()
+            session.trust_env = False
+            response = session.post(url_metrics, params=params, timeout=600)
             response.raise_for_status()
             st.session_state.global_metrics = response.json()
         except Exception as e:
@@ -113,27 +115,6 @@ def load_metrics_once():
 metrics = load_metrics_once()
 
 
-"""
-def get_global_metrics(refresh: bool = False):
-    
-    #session = requests.Session()
-    #session.trust_env = False
-    try:
-        params = {"refresh": str(refresh).lower()}
-        response = requests.post(url_metrics, params=params, timeout=600)
-
-        if response.status_code != 200:
-            st.error(f"Erreur API ({response.status_code}): {response.text}")
-            return None
-        response.raise_for_status() 
-        logger.info("Requête GET envoyée avec succès à l'API.")
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        st.error(f"Erreur de connexion à l'API : {e}")
-        return None
-#metrics = get_global_metrics(refresh=True)
-#st.write("**Debug - Type reçu :**", type(metrics))
-"""
 
 st.header("Indicateurs clés du Modèle")
 

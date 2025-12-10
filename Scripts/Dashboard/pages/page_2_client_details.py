@@ -97,9 +97,9 @@ client_id = st.session_state["selected_client_id"]
 
 # requête GET à l'API pour obtenir la prédiction
 try:
-    session = requests.Session()
-    session.trust_env = False
-    response = session.get(f"{url_predict}/{client_id}",
+    #session = requests.Session()
+    #session.trust_env = False
+    response = requests.get(f"{url_predict}/{client_id}",
                              timeout=5000)
     response.raise_for_status()  # lève une exception pour les codes 4xx/5xx
     print(f"Réponse de l'API : {response.json()}, status code : {response.status_code}")

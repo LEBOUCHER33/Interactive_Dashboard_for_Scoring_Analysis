@@ -100,9 +100,9 @@ def load_metrics_once():
     if "global_metrics" not in st.session_state:
         try:
             params = {"refresh": "false"}
-            session = requests.Session()
-            session.trust_env = False
-            response = session.post(url_metrics, params=params, timeout=600)
+            #session = requests.Session()
+            #session.trust_env = False
+            response = requests.post(url_metrics, params=params, timeout=600)
             response.raise_for_status()
             st.session_state.global_metrics = response.json()
         except Exception as e:

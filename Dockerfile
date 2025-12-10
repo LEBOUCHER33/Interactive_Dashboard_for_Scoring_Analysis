@@ -24,4 +24,4 @@ EXPOSE 8000
 # execution de l'application lors du lancement du conteneur
 WORKDIR /app
 #CMD ["python", "-m", "uvicorn", "Scripts.App.api:app", "--host", "0.0.0.0", "--port", "10000"]
-CMD ["streamlit", "run", "Scripts/Dashboard/page_1_model_overview", "--server.port=10000", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "Scripts/Dashboard/page_1_model_overview.py", "--server.port=10000", "--server.address=0.0.0.0"]

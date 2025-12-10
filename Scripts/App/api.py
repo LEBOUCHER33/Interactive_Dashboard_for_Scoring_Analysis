@@ -128,7 +128,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ou l’URL de ton frontend Render
+    allow_origins=["https://interactive-dashboard-for-scoring-3y6d.onrender.com/"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

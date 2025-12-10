@@ -112,7 +112,7 @@ async def lifespan(app: FastAPI):
             model_pipeline=model_pipeline,
             explainer=GLOBAL_EXPLAINER,
             features_mapping=features_mapping,
-            sample_size=2000
+            sample_size=200
         )
         CACHED_METRICS = jsonable_encoder(raw_metrics)
         print("[STARTUP] Métriques pré-calculées avec succès !")

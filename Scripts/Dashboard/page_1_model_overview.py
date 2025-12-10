@@ -95,18 +95,27 @@ st.info("Outil métier d'aide à la décision pour l'octroi d'un crédit à la c
 # //////////////////////////////////////////////////////////////////////
 
 
-METRICS_DIR = "./Metrics"
-os.makedirs(METRICS_DIR, exist_ok=True)
 
-@st.cache_data(show_spinner=True, ttl=30)
+def load_metrics_once():
+    if "global_metrics" not in st.session_state:
+        try:
+            params = {"refresh": "false"}
+            response = requests.post(url_metrics, params=params, timeout=600)
+            response.raise_for_status()
+            st.session_state.global_metrics = response.json()
+        except Exception as e:
+            st.error(f"Erreur API: {e}")
+            st.stop()
+
+    return st.session_state.global_metrics
+
+
+metrics = load_metrics_once()
+
+
+"""
 def get_global_metrics(refresh: bool = False):
-    """
-    _Summary_: Récupération des métriques globales du modèle via l'API.
-    _Args_:
-        refresh (bool): Recalcul des métriques. Par défaut False.
-    _Returns_:
-        dict: métriques globales ou None si erreur
-    """
+    
     #session = requests.Session()
     #session.trust_env = False
     try:
@@ -122,13 +131,11 @@ def get_global_metrics(refresh: bool = False):
     except requests.exceptions.RequestException as e:
         st.error(f"Erreur de connexion à l'API : {e}")
         return None
-
-
+#metrics = get_global_metrics(refresh=True)
+#st.write("**Debug - Type reçu :**", type(metrics))
+"""
 
 st.header("Indicateurs clés du Modèle")
-
-metrics = get_global_metrics(refresh=True)
-#st.write("**Debug - Type reçu :**", type(metrics))
 
 if metrics is None:
     st.error("Impossible de récupérer les métriques depuis l’API.")

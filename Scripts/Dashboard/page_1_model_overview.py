@@ -66,8 +66,11 @@ url_predict = f"{API_URL}/predict"
 url_metrics = f"{API_URL}/compute_metrics"
 
 # data
-file_path = "./Data/Data_cleaned/application_test_final.csv"
-data = pd.read_csv(file_path)
+
+url = "https://drive.google.com/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP"
+data =  pd.read_csv(url)
+#file_path = "./Data/Data_cleaned/application_test_final.csv"
+#data = pd.read_csv(file_path)
 try:
     logger.info("Données client chargées avec succès.")
 except Exception as e:

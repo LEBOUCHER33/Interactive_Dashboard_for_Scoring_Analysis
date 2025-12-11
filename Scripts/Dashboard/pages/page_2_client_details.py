@@ -38,8 +38,10 @@ else:
 url_predict = f"{API_URL}/predict"
 
 # data
-file_path = "./Data/Data_cleaned/application_test_final.csv"
-df = pd.read_csv(file_path)
+url = "https://drive.google.com/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP"
+df =  pd.read_csv(url)
+#file_path = "./Data/Data_cleaned/application_test_final.csv"
+#df = pd.read_csv(file_path)
 try:
     logger.info("Données client chargées avec succès.")
 except Exception as e:

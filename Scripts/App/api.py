@@ -58,10 +58,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # loading des data
 # //////////////////////////////////////////////////
 
-from google.colab import drive
-drive.mount('/content/drive')
+#https://drive.google.com/file/d/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP/view?usp=drive_link
 
-url = "/content/drive/MyDrive/Data/Data_cleaned/application_test_final.csv"
+url = "https://drive.google.com/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP"
 df =  pd.read_csv(url)
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 

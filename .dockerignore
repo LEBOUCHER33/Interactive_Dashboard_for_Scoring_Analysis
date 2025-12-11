@@ -5,3 +5,4 @@ logs
 my_env_p8
 App/__pycache__
 Metrics
+Data/Data_cleaned/application_train_final.csv

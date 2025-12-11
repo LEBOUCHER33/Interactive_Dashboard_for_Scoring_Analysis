@@ -61,7 +61,7 @@ from fastapi.middleware.cors import CORSMiddleware
 df =  pd.read_csv("./Data/Data_cleaned/application_test_final.csv")
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
-df = df.sample(2000)
+df = df.sample(500)
 
 
 # //////////////////////////////////////////////////

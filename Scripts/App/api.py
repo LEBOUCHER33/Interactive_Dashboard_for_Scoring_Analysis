@@ -38,7 +38,7 @@ import pickle
 import pandas as pd
 import shap
 from loguru import logger
-from Scripts.App.utils import features_mapping, compute_metrics
+from utils import features_mapping, compute_metrics
 from contextlib import asynccontextmanager
 from requests import request
 import numpy as np
@@ -58,7 +58,11 @@ from fastapi.middleware.cors import CORSMiddleware
 # loading des data
 # //////////////////////////////////////////////////
 
-df =  pd.read_csv("./Data/Data_cleaned/application_test_final.csv")
+from google.colab import drive
+drive.mount('/content/drive')
+
+url = "/content/drive/MyDrive/Data/Data_cleaned/application_test_final.csv"
+df =  pd.read_csv(url)
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
 df = df.sample(500)

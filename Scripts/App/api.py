@@ -38,7 +38,7 @@ import pickle
 import pandas as pd
 import shap
 from loguru import logger
-from Script.App.utils import features_mapping, compute_metrics
+from Scripts.App.utils import features_mapping, compute_metrics
 from contextlib import asynccontextmanager
 from requests import request
 import numpy as np

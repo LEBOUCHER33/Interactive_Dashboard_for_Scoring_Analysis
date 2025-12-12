@@ -16,7 +16,7 @@ import os
 import matplotlib.pyplot as plt
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils import features_mapping
+from Scripts.App.utils import features_mapping
 
 
 

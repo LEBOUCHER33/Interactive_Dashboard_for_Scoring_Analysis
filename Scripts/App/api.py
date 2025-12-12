@@ -64,7 +64,7 @@ url = "https://drive.google.com/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP"
 df =  pd.read_csv(url)
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
-df = df.sample(500)
+
 
 
 # //////////////////////////////////////////////////
@@ -97,26 +97,20 @@ GLOBAL_EXPLAINER = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global CACHED_METRICS, GLOBAL_EXPLAINER
+    global CACHED_METRICS
     print("[STARTUP] Lancement de l'API...")
     
     # 1. Chargement/Calcul de l'Explainer
-    try:
-        print("[STARTUP] Calcul de l'explainer SHAP...")
-        GLOBAL_EXPLAINER = shap.TreeExplainer(model)
-        print("[STARTUP] Explainer prêt.")
-    except Exception as e:
-        print(f"[STARTUP] Erreur Explainer : {e}")
-
+    
     # 2. Tentative de calcul des métriques (Petit échantillon)
     try:
         print("[STARTUP] Tentative de pré-calcul des métriques...")
         raw_metrics = compute_metrics(
             df=df, 
             model_pipeline=model_pipeline,
-            explainer=GLOBAL_EXPLAINER,
+            explainer=None,
             features_mapping=features_mapping,
-            sample_size=len(df)
+            sample_size=min(500,len(df))
         )
         CACHED_METRICS = jsonable_encoder(raw_metrics)
         print("[STARTUP] Métriques pré-calculées avec succès !")
@@ -147,6 +141,8 @@ async def compute_data(refresh:bool = False):
         logger.info(f"REQ REÇUE - Refresh demandé : {refresh}")
         try:  
             df_copy = df.copy()
+            if GLOBAL_EXPLAINER is None:
+                GLOBAL_EXPLAINER = shap.TreeExplainer(model)
             raw_metrics = compute_metrics(
                     df=df_copy,  
                     model_pipeline=model_pipeline,

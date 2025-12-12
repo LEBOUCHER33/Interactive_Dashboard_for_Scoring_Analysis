@@ -59,8 +59,11 @@ from fastapi.middleware.cors import CORSMiddleware
 # //////////////////////////////////////////////////
 
 #https://drive.google.com/file/d/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP/view?usp=drive_link
+#https://drive.google.com/file/d/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP/view?usp=drive_link
 
-url = "https://drive.google.com/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP"
+FILE_ID=1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP
+
+url = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
 df =  pd.read_csv(url)
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 

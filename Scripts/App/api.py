@@ -65,12 +65,18 @@ FILE_ID = "1O8nJnYQnTolRfoP4mFyc13OlZBeAm-Nv"
 
 url = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
 
-response = requests.get(url)
-response.raise_for_status()
 
-df = pd.read_csv(io.BytesIO(response.content))
-df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
+def load_df_sample(n=500):
+    response = requests.get(url)
+    response.raise_for_status()
+    return pd.read_csv(
+        io.BytesIO(response.content),
+        sep=",",
+        engine="python",
+        nrows=n
+    )
 
+df = load_df_sample()
 
 
 

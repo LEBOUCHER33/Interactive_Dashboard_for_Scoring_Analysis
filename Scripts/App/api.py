@@ -45,7 +45,7 @@ import numpy as np
 import traceback
 import os
 import requests
-
+import io
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -63,8 +63,12 @@ from fastapi.middleware.cors import CORSMiddleware
 FILE_ID = "1O8nJnYQnTolRfoP4mFyc13OlZBeAm-Nv"
 
 
-url = f"https://drive.google.com/uc?id={FILE_ID}"
-df =  pd.read_csv(url)
+url = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
+
+response = requests.get(url)
+response.raise_for_status()
+
+df = pd.read_csv(io.BytesIO(response.content))
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
 
@@ -129,7 +133,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://interactive-dashboard-for-scoring-3y6d.onrender.com/"],  
+    allow_origins=["https://interactive-dashboard-for-scoring-3y6d.onrender.com"],  
     allow_methods=["*"],
     allow_headers=["*"],
 )

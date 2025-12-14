@@ -58,10 +58,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # loading des data
 # //////////////////////////////////////////////////
 
-#https://drive.google.com/file/d/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP/view?usp=drive_link
-#https://drive.google.com/file/d/1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP/view?usp=drive_link
+#https://drive.google.com/file/d/1O8nJnYQnTolRfoP4mFyc13OlZBeAm-Nv/view?usp=drive_link
 
-FILE_ID = "1EsXWI3ZGOkXmP70R09eNCKbLCLeS7LDP"
+FILE_ID = "1O8nJnYQnTolRfoP4mFyc13OlZBeAm-Nv"
 
 url = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
 df =  pd.read_csv(url)

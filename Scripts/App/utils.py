@@ -227,7 +227,7 @@ def compute_metrics (df : pd.DataFrame, model_pipeline : object, explainer : obj
             "top_features": top_5_features_serializable
         }
     os.makedirs("./Metrics", exist_ok=True)
-    shap_plot_path = "./Scripts/App/assets/global_shap.png"
+    shap_plot_path = "./Metrics/global_shap.png"
     plt.figure(figsize=(10, 6))
     shap.summary_plot(shap_values, 
                       features=data_transformed,

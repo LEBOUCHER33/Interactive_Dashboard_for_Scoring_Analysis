@@ -63,7 +63,7 @@ DATA_PATH = "./Scripts/App/assets/data_sample.csv"
 df = pd.read_csv(DATA_PATH)
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
-
+GRAPH_PATH = "./Scripts/App/assets/global_graph.png"
 
 # //////////////////////////////////////////////////
 # loading du pipeline de prédiction

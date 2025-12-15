@@ -57,7 +57,7 @@ import os
 # url
 USE_RENDER = True  # False = local, True = Render
 if USE_RENDER:
-    API_URL = "https://client-scoring-model.onrender.com"
+    API_URL = "https://scoring-model-2z6o.onrender.com"
 else:
     API_URL = "http://127.0.0.1:8000"
 

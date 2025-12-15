@@ -1,16 +1,13 @@
 # Données lourdes
 Data/
-Data_source/
-Data/Data_cleaned/application_test_final.csv
 Metrics/
+*.csv
 
 # Notebooks
 *.ipynb
 
 # Environnements locaux
 my_env_p8/
-venv/
-.env
 
 # Logs
 logs/

@@ -58,13 +58,17 @@ from fastapi.middleware.cors import CORSMiddleware
 # loading des data
 # //////////////////////////////////////////////////
 
+
+# on héberge notre dataset sur le cloud
+
 #https://drive.google.com/file/d/1O8nJnYQnTolRfoP4mFyc13OlZBeAm-Nv/view?usp=drive_link
 
-FILE_ID = "1O8nJnYQnTolRfoP4mFyc13OlZBeAm-Nv"
-
+FILE_ID="1O8nJnYQnTolRfoP4mFyc13OlZBeAm-Nv"
 
 url = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
 
+
+# on définit une fonction pour loader uniquement un échantillon du dataset pour le déploiement sur le cloud
 
 def load_df_sample(n=500):
     response = requests.get(url)
@@ -75,8 +79,9 @@ def load_df_sample(n=500):
         engine="python",
         nrows=n
     )
+#df =  pd.read_csv(url)
+#df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
-df = load_df_sample()
 
 
 
@@ -112,25 +117,15 @@ GLOBAL_EXPLAINER = None
 async def lifespan(app: FastAPI):
     global CACHED_METRICS
     print("[STARTUP] Lancement de l'API...")
-    
-    # 1. Chargement/Calcul de l'Explainer
-    
-    # 2. Tentative de calcul des métriques (Petit échantillon)
-    try:
-        print("[STARTUP] Tentative de pré-calcul des métriques...")
-        raw_metrics = compute_metrics(
-            df=df, 
-            model_pipeline=model_pipeline,
-            explainer=None,
-            features_mapping=features_mapping,
-            sample_size=min(500,len(df))
-        )
-        CACHED_METRICS = jsonable_encoder(raw_metrics)
-        print("[STARTUP] Métriques pré-calculées avec succès !")
-    except Exception as e:
-        print(f"[STARTUP] Échec du pré-calcul : {e}")
-        CACHED_METRICS = None
-    
+    df_sample = load_df_sample(n=500)
+    raw_metrics = compute_metrics(
+        df=df_sample,
+        model_pipeline=model_pipeline,
+        explainer=None,
+        features_mapping=features_mapping,
+        sample_size=len(df_sample)
+    )
+    CACHED_METRICS=jsonable_encoder(raw_metrics)
     yield
     print("[SHUTDOWN] Arrêt de l'API.")
 

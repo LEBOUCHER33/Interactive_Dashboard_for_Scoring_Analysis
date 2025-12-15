@@ -90,6 +90,7 @@ CACHED_METRICS = None
 GLOBAL_EXPLAINER = None
 
 
+
 # ////////////////////////////////////////////////////////////////////////////////////
 # création d'un endpoint compute_metrics pour lire les indicateurs globaux du modèle 
 # ////////////////////////////////////////////////////////////////////////////////////
@@ -97,21 +98,13 @@ GLOBAL_EXPLAINER = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global CACHED_METRICS
-    print("[STARTUP] Lancement de l'API...")
-    # 1. Chargement/Calcul de l'Explainer
-    try:
-        print("[STARTUP] Calcul de l'explainer SHAP...")
-        GLOBAL_EXPLAINER = shap.TreeExplainer(model)
-        print("[STARTUP] Explainer prêt.")
-    except Exception as e:
-        print(f"[STARTUP] Erreur Explainer : {e}")
-    # 2. Tentative de calcul des métriques 
+    print("[STARTUP] Lancement de l'API...") 
     try:
         print("[STARTUP] Tentative de pré-calcul des métriques...")
         raw_metrics = compute_metrics(
             df=df, 
             model_pipeline=model_pipeline,
-            explainer=GLOBAL_EXPLAINER,
+            explainer=None,
             features_mapping=features_mapping,
             sample_size=len(df)
         )
@@ -125,14 +118,6 @@ async def lifespan(app: FastAPI):
     print("[SHUTDOWN] Arrêt de l'API.")
 
 app = FastAPI(lifespan=lifespan)
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://interactive-dashboard-for-scoring-3y6d.onrender.com"],  
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 

@@ -98,35 +98,36 @@ st.info("Outil métier d'aide à la décision pour l'octroi d'un crédit à la c
 # //////////////////////////////////////////////////////////////////////
 
 
-
 def load_metrics_once():
     if "global_metrics" not in st.session_state:
+        with st.spinner("Chargement des métriques globales..."):
+            try:
+                response = requests.post(
+                    url_metrics,
+                    params={"refresh": "false"},
+                    timeout=600
+                )
+                response.raise_for_status()
+                st.session_state["global_metrics"] = response.json()
+            except Exception as e:
+                st.error(f"Erreur API: {e}")
+                st.stop()
+
+    return st.session_state["global_metrics"]
+
+if st.button("🔄 Recalculer les métriques"):
+    with st.spinner("Recalcul en cours..."):
         try:
-            params = {"refresh": "false"}
-            #session = requests.Session()
-            #session.trust_env = False
-            response = requests.post(url_metrics, params=params, timeout=600)
+            response = requests.post(
+                url_metrics,
+                params={"refresh": "true"},
+                timeout=600
+            )
             response.raise_for_status()
-            st.session_state.global_metrics = response.json()
+            st.session_state["global_metrics"] = response.json()
+            st.success("Métriques recalculées !")
         except Exception as e:
             st.error(f"Erreur API: {e}")
-            st.stop()
-
-    return st.session_state.global_metrics
-
-
-if st.button("Recalculer les métriques"):
-    try:
-        response = requests.post(
-            url_metrics,
-            params={"refresh": "true"},
-            timeout=600
-        )
-        response.raise_for_status()
-        st.session_state.global_metrics = response.json()  # 🔥 CORRECTION
-        st.success("Métriques recalculées !")
-    except Exception as e:
-        st.error(f"Erreur API: {e}")
 
 
 metrics = load_metrics_once()

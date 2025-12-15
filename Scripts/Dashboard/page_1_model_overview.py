@@ -66,7 +66,7 @@ url_predict = f"{API_URL}/predict"
 url_metrics = f"{API_URL}/compute_metrics"
 
 # data
-
+  
 
 DATA_PATH = "./Scripts/App/assets/data_sample.csv"
 df = pd.read_csv(DATA_PATH)

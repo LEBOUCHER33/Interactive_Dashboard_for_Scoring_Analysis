@@ -55,7 +55,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 # //////////////////////////////////////////////////
-# loading des data
+# loading des data et de l'explainer
 # //////////////////////////////////////////////////
 
 
@@ -79,9 +79,6 @@ def load_df_sample(n=500):
         engine="python",
         nrows=n
     )
-#df =  pd.read_csv(url)
-#df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
-
 
 
 
@@ -118,6 +115,7 @@ async def lifespan(app: FastAPI):
     global CACHED_METRICS
     print("[STARTUP] Lancement de l'API...")
     df_sample = load_df_sample(n=500)
+    df_sample = df_sample.replace({np.nan: None, np.inf: None, -np.inf: None})
     raw_metrics = compute_metrics(
         df=df_sample,
         model_pipeline=model_pipeline,

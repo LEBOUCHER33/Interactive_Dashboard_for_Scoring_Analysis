@@ -10,13 +10,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# copie des dépendances 
-COPY . .
+# Dépendances Python
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # installation des dépendances
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
+# copie du code 
+COPY Scripts/ ./Scripts/
 
 # expose le port local de l'api
 EXPOSE 10000

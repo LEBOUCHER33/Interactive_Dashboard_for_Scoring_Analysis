@@ -1,8 +1,24 @@
-README.md
-Data_source
-notebook_1.ipynb
-logs
-my_env_p8
-App/__pycache__
-Metrics
-Data/Data_cleaned/application_train_final.csv
+# Données lourdes
+Data/
+Data_source/
+Metrics/
+
+# Notebooks
+*.ipynb
+
+# Environnements locaux
+my_env_p8/
+venv/
+.env
+
+# Logs
+logs/
+*.log
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Git
+.git/
+.gitignore

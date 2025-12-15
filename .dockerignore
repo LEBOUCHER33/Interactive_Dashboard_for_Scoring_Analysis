@@ -1,6 +1,7 @@
 # Données lourdes
 Data/
 Data_source/
+Data/Data_cleaned/application_test_final.csv
 Metrics/
 
 # Notebooks

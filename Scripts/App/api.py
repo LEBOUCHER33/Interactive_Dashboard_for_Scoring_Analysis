@@ -97,13 +97,15 @@ GLOBAL_EXPLAINER = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global CACHED_METRICS
-    print("[STARTUP] Lancement de l'API...") 
+    print("[STARTUP] Lancement de l'API...")
+    if GLOBAL_EXPLAINER is None:
+                GLOBAL_EXPLAINER = shap.TreeExplainer(model) 
     try:
         print("[STARTUP] Tentative de pré-calcul des métriques...")
         raw_metrics = compute_metrics(
             df=df, 
             model_pipeline=model_pipeline,
-            explainer=None,
+            explainer=GLOBAL_EXPLAINER,
             features_mapping=features_mapping,
             sample_size=len(df)
         )

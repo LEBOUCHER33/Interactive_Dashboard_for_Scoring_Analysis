@@ -59,7 +59,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # //////////////////////////////////////////////////
 
 
-DATA_PATH = "assets/data_sample.csv"
+DATA_PATH = "./Scripts/App/assets/data_sample.csv"
 
 df = pd.read_csv(DATA_PATH)
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})

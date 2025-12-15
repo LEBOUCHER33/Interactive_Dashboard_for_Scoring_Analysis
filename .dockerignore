@@ -1,7 +1,6 @@
 # Données lourdes
 Data/
 Metrics/
-*.csv
 
 # Notebooks
 *.ipynb

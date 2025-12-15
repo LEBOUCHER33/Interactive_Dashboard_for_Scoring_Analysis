@@ -116,12 +116,17 @@ def load_metrics_once():
 
 
 if st.button("Recalculer les métriques"):
-    params = {"refresh": "true"}
-    session = requests.Session()
-    session.trust_env = False
-    response = session.post(url_metrics, params=params, timeout=600)
-    st.session_state.metrics = response.json()
-    st.success("Métriques recalculées !")
+    try:
+        response = requests.post(
+            url_metrics,
+            params={"refresh": "true"},
+            timeout=600
+        )
+        response.raise_for_status()
+        st.session_state.global_metrics = response.json()  # 🔥 CORRECTION
+        st.success("Métriques recalculées !")
+    except Exception as e:
+        st.error(f"Erreur API: {e}")
 
 
 metrics = load_metrics_once()

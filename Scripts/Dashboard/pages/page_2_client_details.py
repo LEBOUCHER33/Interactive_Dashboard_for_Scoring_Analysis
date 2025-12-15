@@ -15,10 +15,11 @@ import traceback
 import os
 import matplotlib.pyplot as plt
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+sys.path.append(ROOT_DIR)
+
 from Scripts.App.utils import features_mapping
-
-
 
 
 

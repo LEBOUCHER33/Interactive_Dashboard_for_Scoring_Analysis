@@ -98,8 +98,14 @@ GLOBAL_EXPLAINER = None
 async def lifespan(app: FastAPI):
     global CACHED_METRICS
     print("[STARTUP] Lancement de l'API...")
-    if GLOBAL_EXPLAINER is None:
-                GLOBAL_EXPLAINER = shap.TreeExplainer(model) 
+    # 1. Chargement/Calcul de l'Explainer
+    try:
+        print("[STARTUP] Calcul de l'explainer SHAP...")
+        GLOBAL_EXPLAINER = shap.TreeExplainer(model)
+        print("[STARTUP] Explainer prêt.")
+    except Exception as e:
+        print(f"[STARTUP] Erreur Explainer : {e}")
+    # 2. Pré-calcul des métriques globales
     try:
         print("[STARTUP] Tentative de pré-calcul des métriques...")
         raw_metrics = compute_metrics(

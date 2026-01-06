@@ -15,10 +15,11 @@ import traceback
 import os
 import matplotlib.pyplot as plt
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils import features_mapping
 
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+sys.path.append(ROOT_DIR)
 
+from Scripts.App.utils import features_mapping
 
 
 
@@ -28,9 +29,9 @@ from utils import features_mapping
 # /////////////////////////////////////////
 
 # url
-USE_RENDER = False  # False = local, True = Render
+USE_RENDER = True  # False = local, True = Render
 if USE_RENDER:
-    API_URL = "https://client-scoring-model.onrender.com"
+    API_URL = "https://scoring-model-2z6o.onrender.com"
 else:
     API_URL = "http://127.0.0.1:8000"
 
@@ -38,8 +39,10 @@ else:
 url_predict = f"{API_URL}/predict"
 
 # data
-file_path = "./Data/Data_cleaned/application_test_final.csv"
-df = pd.read_csv(file_path)
+
+DATA_PATH = "./Scripts/App/assets/data_sample.csv"
+df = pd.read_csv(DATA_PATH)
+
 try:
     logger.info("Données client chargées avec succès.")
 except Exception as e:
@@ -97,9 +100,9 @@ client_id = st.session_state["selected_client_id"]
 
 # requête GET à l'API pour obtenir la prédiction
 try:
-    session = requests.Session()
-    session.trust_env = False
-    response = session.get(f"{url_predict}/{client_id}",
+    #session = requests.Session()
+    #session.trust_env = False
+    response = requests.get(f"{url_predict}/{client_id}",
                              timeout=5000)
     response.raise_for_status()  # lève une exception pour les codes 4xx/5xx
     print(f"Réponse de l'API : {response.json()}, status code : {response.status_code}")

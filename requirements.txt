@@ -2,7 +2,7 @@
 # outils de feature_engineering / analyse des data
 pandas
 numpy
-scikit_learn
+scikit-learn==1.6.1
 
 # outils de visualisation
 matplotlib

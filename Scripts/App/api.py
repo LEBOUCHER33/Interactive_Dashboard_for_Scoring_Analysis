@@ -45,19 +45,25 @@ import numpy as np
 import traceback
 import os
 import requests
-
+import io
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+
+
+
 # //////////////////////////////////////////////////
-# loading des data
+# loading des data et de l'explainer
 # //////////////////////////////////////////////////
 
-df =  pd.read_csv("./Data/Data_cleaned/application_test_final.csv")
+
+DATA_PATH = "./Scripts/App/assets/data_sample.csv"
+
+df = pd.read_csv(DATA_PATH)
 df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
 
-
+GRAPH_PATH = "./Scripts/App/assets/global_graph.png"
 
 # //////////////////////////////////////////////////
 # loading du pipeline de prédiction
@@ -83,15 +89,15 @@ CACHED_METRICS = None
 GLOBAL_EXPLAINER = None
 
 
+
 # ////////////////////////////////////////////////////////////////////////////////////
 # création d'un endpoint compute_metrics pour lire les indicateurs globaux du modèle 
 # ////////////////////////////////////////////////////////////////////////////////////
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global CACHED_METRICS, GLOBAL_EXPLAINER
+    global CACHED_METRICS
     print("[STARTUP] Lancement de l'API...")
-    
     # 1. Chargement/Calcul de l'Explainer
     try:
         print("[STARTUP] Calcul de l'explainer SHAP...")
@@ -99,8 +105,7 @@ async def lifespan(app: FastAPI):
         print("[STARTUP] Explainer prêt.")
     except Exception as e:
         print(f"[STARTUP] Erreur Explainer : {e}")
-
-    # 2. Tentative de calcul des métriques (Petit échantillon)
+    # 2. Pré-calcul des métriques globales
     try:
         print("[STARTUP] Tentative de pré-calcul des métriques...")
         raw_metrics = compute_metrics(
@@ -122,14 +127,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+
 @app.post("/compute_metrics")
 async def compute_data(refresh:bool = False):
-    global CACHED_METRICS, GLOBAL_EXPLAINER
+    global CACHED_METRICS , GLOBAL_EXPLAINER
     
     if refresh or CACHED_METRICS is None:
         logger.info(f"REQ REÇUE - Refresh demandé : {refresh}")
         try:  
             df_copy = df.copy()
+            if GLOBAL_EXPLAINER is None:
+                GLOBAL_EXPLAINER = shap.TreeExplainer(model)
             raw_metrics = compute_metrics(
                     df=df_copy,  
                     model_pipeline=model_pipeline,

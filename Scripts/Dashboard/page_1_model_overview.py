@@ -55,9 +55,9 @@ import os
 # /////////////////////////////////////////
 
 # url
-USE_RENDER = False  # False = local, True = Render
+USE_RENDER = True  # False = local, True = Render
 if USE_RENDER:
-    API_URL = "https://client-scoring-model.onrender.com"
+    API_URL = "https://scoring-model-2z6o.onrender.com"
 else:
     API_URL = "http://127.0.0.1:8000"
 
@@ -66,8 +66,11 @@ url_predict = f"{API_URL}/predict"
 url_metrics = f"{API_URL}/compute_metrics"
 
 # data
-file_path = "./Data/Data_cleaned/application_test_final.csv"
-data = pd.read_csv(file_path)
+  
+
+DATA_PATH = "./Scripts/App/assets/data_sample.csv"
+df = pd.read_csv(DATA_PATH)
+
 try:
     logger.info("Données client chargées avec succès.")
 except Exception as e:
@@ -95,30 +98,36 @@ st.info("Outil métier d'aide à la décision pour l'octroi d'un crédit à la c
 # //////////////////////////////////////////////////////////////////////
 
 
-
 def load_metrics_once():
     if "global_metrics" not in st.session_state:
+        with st.spinner("Chargement des métriques globales..."):
+            try:
+                response = requests.post(
+                    url_metrics,
+                    params={"refresh": "false"},
+                    timeout=600
+                )
+                response.raise_for_status()
+                st.session_state["global_metrics"] = response.json()
+            except Exception as e:
+                st.error(f"Erreur API: {e}")
+                st.stop()
+
+    return st.session_state["global_metrics"]
+
+if st.button("🔄 Recalculer les métriques"):
+    with st.spinner("Recalcul en cours..."):
         try:
-            params = {"refresh": "false"}
-            session = requests.Session()
-            session.trust_env = False
-            response = session.post(url_metrics, params=params, timeout=600)
+            response = requests.post(
+                url_metrics,
+                params={"refresh": "true"},
+                timeout=600
+            )
             response.raise_for_status()
-            st.session_state.global_metrics = response.json()
+            st.session_state["global_metrics"] = response.json()
+            st.success("Métriques recalculées !")
         except Exception as e:
             st.error(f"Erreur API: {e}")
-            st.stop()
-
-    return st.session_state.global_metrics
-
-
-if st.button("Recalculer les métriques"):
-    params = {"refresh": "true"}
-    session = requests.Session()
-    session.trust_env = False
-    response = session.post(url_metrics, params=params, timeout=600)
-    st.session_state.metrics = response.json()
-    st.success("Métriques recalculées !")
 
 
 metrics = load_metrics_once()

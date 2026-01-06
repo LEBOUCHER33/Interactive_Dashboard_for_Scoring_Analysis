@@ -1,5 +1,21 @@
-README.md
-Data_source
-notebook_1.ipynb
-logs
-my_env_p8
+# Données lourdes
+Data/
+Metrics/
+
+# Notebooks
+*.ipynb
+
+# Environnements locaux
+my_env_p8/
+
+# Logs
+logs/
+*.log
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Git
+.git/
+.gitignore
